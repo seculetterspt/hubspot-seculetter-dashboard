@@ -322,7 +322,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
 
     // 전화 조회
     try {
-      const callsRes = await hubspotClient.getCalls(200);
+      const callsRes = await hubspotClient.getCalls(100);
       const filteredCalls = callsRes.results.filter(c => {
         const timestamp = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
         return timestamp && timestamp >= fromDate && timestamp <= toDate;
@@ -349,7 +349,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
 
     // 메모 조회
     try {
-      const notesRes = await hubspotClient.getNotes(200);
+      const notesRes = await hubspotClient.getNotes(100);
       const filteredNotes = notesRes.results.filter(n => {
         const timestamp = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
         return timestamp && timestamp >= fromDate && timestamp <= toDate;
@@ -376,7 +376,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
 
     // 미팅 조회 (예정된 미팅 포함)
     try {
-      const meetingsRes = await hubspotClient.getMeetings(200);
+      const meetingsRes = await hubspotClient.getMeetings(100);
       const filteredMeetings = meetingsRes.results.filter(m => {
         const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
         return startTime && startTime >= fromDate && startTime <= toDate;
@@ -401,11 +401,11 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       console.error('Error fetching meetings for timeline:', error);
     }
 
-    // 이메일 조회
+    // 이메일 조회 (scope 미승인시 무시)
     try {
       const emailsRes = await hubspotClient.api.crm.objects.basicApi.getPage(
         'emails',
-        200,
+        100,
         undefined,
         ['hs_email_subject', 'hs_email_text', 'hs_email_direction', 'hs_timestamp']
       );
