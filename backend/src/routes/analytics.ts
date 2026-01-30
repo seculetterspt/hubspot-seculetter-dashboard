@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../config/database.js';
 import { dailySnapshotService } from '../services/analytics/DailySnapshot.js';
 import { hubspotClient } from '../services/hubspot/HubspotClient.js';
+import { summaryService } from '../services/openai/SummaryService.js';
 
 const router = Router();
 
@@ -153,6 +154,132 @@ router.get('/recent-activities', async (req: Request, res: Response) => {
       emails
     }
   });
+});
+
+// 활동 요약 (OpenAI LLM)
+router.get('/activity-summary', async (req: Request, res: Response) => {
+  try {
+    // KST = UTC + 9시간
+    const now = new Date();
+    const utc24hAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+    // 활동 데이터 수집
+    const activities: Array<{
+      id: string;
+      type: 'call' | 'note' | 'meeting' | 'email';
+      subject?: string;
+      body?: string;
+      timestamp: string;
+    }> = [];
+
+    // 전화
+    try {
+      const callsRes = await hubspotClient.getCalls(50);
+      callsRes.results
+        .filter(c => {
+          const timestamp = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
+          return timestamp && timestamp >= utc24hAgo;
+        })
+        .forEach(c => {
+          activities.push({
+            id: c.id,
+            type: 'call',
+            subject: c.properties.hs_call_title || undefined,
+            body: c.properties.hs_call_body || undefined,
+            timestamp: c.properties.hs_timestamp || ''
+          });
+        });
+    } catch (error) {
+      console.error('Error fetching calls for summary:', error);
+    }
+
+    // 메모
+    try {
+      const notesRes = await hubspotClient.getNotes(50);
+      notesRes.results
+        .filter(n => {
+          const timestamp = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
+          return timestamp && timestamp >= utc24hAgo;
+        })
+        .forEach(n => {
+          activities.push({
+            id: n.id,
+            type: 'note',
+            body: n.properties.hs_note_body || undefined,
+            timestamp: n.properties.hs_timestamp || ''
+          });
+        });
+    } catch (error) {
+      console.error('Error fetching notes for summary:', error);
+    }
+
+    // 미팅
+    try {
+      const meetingsRes = await hubspotClient.getMeetings(50);
+      meetingsRes.results
+        .filter(m => {
+          const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
+          return startTime && startTime >= utc24hAgo;
+        })
+        .forEach(m => {
+          activities.push({
+            id: m.id,
+            type: 'meeting',
+            subject: m.properties.hs_meeting_title || undefined,
+            body: m.properties.hs_meeting_body || undefined,
+            timestamp: m.properties.hs_meeting_start_time || ''
+          });
+        });
+    } catch (error) {
+      console.error('Error fetching meetings for summary:', error);
+    }
+
+    // 이메일
+    try {
+      const emailsRes = await hubspotClient.api.crm.objects.basicApi.getPage(
+        'emails',
+        50,
+        undefined,
+        ['hs_email_subject', 'hs_email_text', 'hs_timestamp']
+      );
+      emailsRes.results
+        .filter(e => {
+          const timestamp = e.properties.hs_timestamp ? new Date(e.properties.hs_timestamp) : null;
+          return timestamp && timestamp >= utc24hAgo;
+        })
+        .forEach(e => {
+          activities.push({
+            id: e.id,
+            type: 'email',
+            subject: e.properties.hs_email_subject || undefined,
+            body: e.properties.hs_email_text || undefined,
+            timestamp: e.properties.hs_timestamp || ''
+          });
+        });
+    } catch (error) {
+      console.error('Error fetching emails for summary (scope may be missing):', error);
+    }
+
+    // OpenAI로 요약 생성
+    const summary = await summaryService.summarizeActivities(activities);
+
+    res.json({
+      activityCount: activities.length,
+      summary,
+      generatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error generating activity summary:', error);
+    res.status(500).json({
+      error: 'Failed to generate activity summary',
+      summary: {
+        overview: '요약 생성 중 오류가 발생했습니다.',
+        keyActivities: [],
+        insights: [],
+        recommendations: ['잠시 후 다시 시도해주세요.']
+      }
+    });
+  }
 });
 
 // 오늘 수정된 데이터 (오브젝트별 테이블)

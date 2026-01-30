@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, Phone, FileText, Calendar, Mail, Clock } from 'lucide-react'
+import { RefreshCw, Phone, FileText, Calendar, Mail, Clock, Sparkles, Lightbulb, Target, CheckCircle2 } from 'lucide-react'
 import { api } from '../services/api'
 
 interface Call {
@@ -64,12 +64,27 @@ interface ActivitiesData {
   }
 }
 
+interface AISummary {
+  overview: string
+  keyActivities: string[]
+  insights: string[]
+  recommendations: string[]
+}
+
+interface AISummaryData {
+  activityCount: number
+  summary: AISummary
+  generatedAt: string
+}
+
 type TabType = 'all' | 'calls' | 'notes' | 'meetings' | 'emails'
 
 export default function RecentActivitiesPage() {
   const [data, setData] = useState<ActivitiesData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('all')
+  const [aiSummary, setAiSummary] = useState<AISummaryData | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -83,8 +98,21 @@ export default function RecentActivitiesPage() {
     }
   }
 
+  const fetchAISummary = async () => {
+    setSummaryLoading(true)
+    try {
+      const res = await api.get('/analytics/activity-summary')
+      setAiSummary(res.data)
+    } catch (error) {
+      console.error('Error fetching AI summary:', error)
+    } finally {
+      setSummaryLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchData()
+    fetchAISummary()
   }, [])
 
   const formatKstTime = (kstTimestamp: string | undefined) => {
@@ -209,6 +237,120 @@ export default function RecentActivitiesPage() {
           </div>
           <p className="text-2xl font-bold text-orange-900">{data?.summary.emails || 0}건</p>
         </div>
+      </div>
+
+      {/* AI Summary Section */}
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="text-indigo-600" size={24} />
+            <h2 className="text-lg font-bold text-indigo-900">AI 활동 요약</h2>
+          </div>
+          <button
+            onClick={fetchAISummary}
+            disabled={summaryLoading}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {summaryLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                분석 중...
+              </>
+            ) : (
+              <>
+                <RefreshCw size={14} />
+                다시 분석
+              </>
+            )}
+          </button>
+        </div>
+
+        {summaryLoading && !aiSummary ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3"></div>
+              <p className="text-indigo-700">AI가 활동을 분석하고 있습니다...</p>
+            </div>
+          </div>
+        ) : aiSummary ? (
+          <div className="space-y-4">
+            {/* Overview */}
+            <div className="bg-white/70 rounded-lg p-4">
+              <p className="text-gray-800 leading-relaxed">{aiSummary.summary.overview}</p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+              {/* Key Activities */}
+              {aiSummary.summary.keyActivities.length > 0 && (
+                <div className="bg-white/70 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Target className="text-blue-600" size={18} />
+                    <h3 className="font-semibold text-gray-800">주요 활동</h3>
+                  </div>
+                  <ul className="space-y-2">
+                    {aiSummary.summary.keyActivities.map((activity, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                        <CheckCircle2 size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                        <span>{activity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Insights */}
+              {aiSummary.summary.insights.length > 0 && (
+                <div className="bg-white/70 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Lightbulb className="text-yellow-600" size={18} />
+                    <h3 className="font-semibold text-gray-800">인사이트</h3>
+                  </div>
+                  <ul className="space-y-2">
+                    {aiSummary.summary.insights.map((insight, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="text-yellow-500">•</span>
+                        <span>{insight}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {aiSummary.summary.recommendations.length > 0 && (
+                <div className="bg-white/70 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="text-purple-600" size={18} />
+                    <h3 className="font-semibold text-gray-800">추천 사항</h3>
+                  </div>
+                  <ul className="space-y-2">
+                    {aiSummary.summary.recommendations.map((rec, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="text-purple-500">→</span>
+                        <span>{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-gray-500 text-right">
+              마지막 분석: {new Date(aiSummary.generatedAt).toLocaleString('ko-KR')}
+            </p>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <Sparkles size={32} className="mx-auto mb-2 opacity-50" />
+            <p>AI 요약을 불러오지 못했습니다</p>
+            <button
+              onClick={fetchAISummary}
+              className="mt-2 text-indigo-600 hover:underline text-sm"
+            >
+              다시 시도
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
