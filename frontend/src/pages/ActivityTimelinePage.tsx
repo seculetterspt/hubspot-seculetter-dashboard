@@ -1,6 +1,14 @@
-import { useEffect, useState, useMemo } from 'react'
-import { RefreshCw, Phone, FileText, Calendar, Mail, Sparkles, Building2, User, Briefcase } from 'lucide-react'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { RefreshCw, Phone, FileText, Calendar, Mail, Sparkles, Building2, User, Briefcase, ExternalLink } from 'lucide-react'
 import { api } from '../services/api'
+
+// HubSpot Portal ID
+const HUBSPOT_PORTAL_ID = '243367573'
+
+// HubSpot URL 생성 함수
+const getHubspotUrl = (type: 'company' | 'contact' | 'deal', id: string) => {
+  return `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/${type}/${id}`
+}
 
 interface Association {
   id: string
@@ -35,8 +43,9 @@ interface TimelineData {
 export default function ActivityTimelinePage() {
   const [data, setData] = useState<TimelineData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [summariesLoading, setSummariesLoading] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const loadedDatesRef = useRef<Set<string>>(new Set())
 
   // 현재 날짜 기준 2주 전/후
   const today = useMemo(() => {
@@ -82,35 +91,44 @@ export default function ActivityTimelinePage() {
     }
   }
 
-  // AI 요약 생성 (선택된 날짜만)
-  const fetchWithSummaries = async () => {
-    if (!selectedDate) return
-    setSummariesLoading(true)
+  // 선택된 날짜의 상세 정보 로딩 (association + AI 요약)
+  const fetchDateDetails = async (dateStr: string) => {
+    // 이미 로딩한 날짜는 스킵
+    if (loadedDatesRef.current.has(dateStr)) return
+
+    setDetailLoading(true)
     try {
-      // 선택된 날짜만 조회 (association + AI 요약)
-      const url = `/analytics/activity-timeline?from=${selectedDate}&to=${selectedDate}&includeAssociations=true&generateSummaries=true`
+      const url = `/analytics/activity-timeline?from=${dateStr}&to=${dateStr}&includeAssociations=true&generateSummaries=true`
       const res = await api.get(url)
 
       // 선택된 날짜의 데이터만 업데이트
-      if (data && res.data.activitiesByDate[selectedDate]) {
-        setData({
-          ...data,
+      if (res.data.activitiesByDate[dateStr]) {
+        setData(prev => prev ? {
+          ...prev,
           activitiesByDate: {
-            ...data.activitiesByDate,
-            [selectedDate]: res.data.activitiesByDate[selectedDate]
+            ...prev.activitiesByDate,
+            [dateStr]: res.data.activitiesByDate[dateStr]
           }
-        })
+        } : prev)
+        loadedDatesRef.current.add(dateStr)
       }
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error fetching date details:', error)
     } finally {
-      setSummariesLoading(false)
+      setDetailLoading(false)
     }
   }
 
   useEffect(() => {
     fetchData()
   }, [])
+
+  // 날짜 선택 시 자동으로 상세 정보 로딩
+  useEffect(() => {
+    if (selectedDate && data) {
+      fetchDateDetails(selectedDate)
+    }
+  }, [selectedDate, data])
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -184,32 +202,16 @@ export default function ActivityTimelinePage() {
             {dateRange.from} ~ {dateRange.to} | 총 {data?.totalCount || 0}건의 활동
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={fetchWithSummaries}
-            disabled={summariesLoading || !selectedDate}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-          >
-            {summariesLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                AI 요약 생성 중...
-              </>
-            ) : (
-              <>
-                <Sparkles size={18} />
-                AI 요약 생성
-              </>
-            )}
-          </button>
-          <button
-            onClick={fetchData}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-          >
-            <RefreshCw size={18} />
-            새로고침
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            loadedDatesRef.current.clear()
+            fetchData()
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+        >
+          <RefreshCw size={18} />
+          새로고침
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -275,7 +277,15 @@ export default function ActivityTimelinePage() {
                   <h2 className="text-xl font-bold text-gray-900">
                     {formatDate(selectedDate).full}
                   </h2>
-                  <span className="text-gray-500">{selectedActivities.length}건의 활동</span>
+                  <div className="flex items-center gap-3">
+                    {detailLoading && (
+                      <div className="flex items-center gap-2 text-purple-600">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                        <span className="text-sm">AI 분석 중...</span>
+                      </div>
+                    )}
+                    <span className="text-gray-500">{selectedActivities.length}건의 활동</span>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -305,25 +315,43 @@ export default function ActivityTimelinePage() {
                               </span>
                             </div>
 
-                            {/* 연결 정보 - 회사/담당자/거래 */}
-                            <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
-                              {companyName && (
-                                <span className="flex items-center gap-1">
+                            {/* 연결 정보 - 회사/담당자/거래 (HubSpot 링크 포함) */}
+                            <div className="flex items-center gap-4 mt-1 text-sm text-gray-600 flex-wrap">
+                              {activity.associations.companies[0] && (
+                                <a
+                                  href={getHubspotUrl('company', activity.associations.companies[0].id)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                                >
                                   <Building2 size={14} className="text-blue-500" />
                                   {companyName}
-                                </span>
+                                  <ExternalLink size={12} className="text-gray-400" />
+                                </a>
                               )}
-                              {contactName && (
-                                <span className="flex items-center gap-1">
+                              {activity.associations.contacts[0] && (
+                                <a
+                                  href={getHubspotUrl('contact', activity.associations.contacts[0].id)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 hover:text-green-600 transition-colors"
+                                >
                                   <User size={14} className="text-green-500" />
                                   {contactName}
-                                </span>
+                                  <ExternalLink size={12} className="text-gray-400" />
+                                </a>
                               )}
-                              {dealName && (
-                                <span className="flex items-center gap-1">
+                              {activity.associations.deals[0] && (
+                                <a
+                                  href={getHubspotUrl('deal', activity.associations.deals[0].id)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 hover:text-purple-600 transition-colors"
+                                >
                                   <Briefcase size={14} className="text-purple-500" />
                                   {dealName}
-                                </span>
+                                  <ExternalLink size={12} className="text-gray-400" />
+                                </a>
                               )}
                               <span className="text-gray-400">{formatTimestamp(activity.timestamp)}</span>
                             </div>
