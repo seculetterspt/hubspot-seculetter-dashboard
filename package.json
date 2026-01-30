@@ -1,0 +1,36 @@
+{
+  "name": "hubspot-seculetter-dashboard",
+  "version": "1.0.0",
+  "description": "Seculetter HubSpot Dashboard - B2B 보안 솔루션 영업 관리 대시보드",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:44453/git/y2tiger/hubspot-seculetter-dashboard"
+  },
+  "keywords": [
+    "hubspot",
+    "dashboard",
+    "crm",
+    "seculetter",
+    "b2b",
+    "sales"
+  ],
+  "author": "Seculetter",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

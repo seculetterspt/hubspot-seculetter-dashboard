@@ -1,0 +1,53 @@
+import axios from 'axios'
+
+const baseURL = import.meta.env.PROD
+  ? '/api'
+  : 'http://localhost:3001/api'
+
+export const api = axios.create({
+  baseURL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Request interceptor
+api.interceptors.request.use(
+  (config) => {
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// Response interceptor
+api.interceptors.response.use(
+  (response) => {
+    return response
+  },
+  (error) => {
+    console.error('API Error:', error.response?.data || error.message)
+    return Promise.reject(error)
+  }
+)
+
+// API functions
+export const analyticsApi = {
+  getOverview: () => api.get('/analytics/overview'),
+  getTrends: (period = 'daily', range = 30) =>
+    api.get(`/analytics/trends?period=${period}&range=${range}`),
+  getPipeline: () => api.get('/analytics/pipeline'),
+  getStalledDeals: () => api.get('/analytics/stalled-deals'),
+  getTodayTasks: () => api.get('/analytics/today-tasks'),
+  getTeamPerformance: () => api.get('/analytics/team-performance'),
+  getForecast: () => api.get('/analytics/forecast'),
+  getPocStatus: () => api.get('/analytics/poc-status'),
+  getContacts: () => api.get('/analytics/contacts'),
+  getCompanies: () => api.get('/analytics/companies'),
+  getTickets: () => api.get('/analytics/tickets'),
+  getActivities: () => api.get('/analytics/activities'),
+}
+
+export default api
