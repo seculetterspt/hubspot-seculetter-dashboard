@@ -263,45 +263,44 @@ export default function ActivityTimelinePage() {
                     const contactName = activity.associations.contacts[0]?.name
                     const dealName = activity.associations.deals[0]?.name
 
+                    // 표시 이름: 회사명 우선, 없으면 담당자명, 없으면 기존 제목
+                    const displayName = companyName || contactName || activity.title
+
                     return (
                       <div
                         key={activity.id}
                         className={`p-4 rounded-xl border-2 ${getTypeBg(activity.type)}`}
                       >
-                        {/* 헤더: 회사명 (활동유형: 날짜) */}
+                        {/* 헤더: 회사명/담당자명 (활동유형: 날짜) */}
                         <div className="flex items-start gap-3 mb-3">
                           <div className="p-2 bg-white rounded-lg shadow-sm">
                             {getTypeIcon(activity.type)}
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              {companyName ? (
-                                <span className="font-bold text-gray-900">{companyName}</span>
-                              ) : (
-                                <span className="font-medium text-gray-700">{activity.title}</span>
-                              )}
+                              <span className="font-bold text-gray-900">{displayName}</span>
                               <span className="text-gray-500">
                                 ({getTypeLabel(activity.type)}: {activity.date})
                               </span>
                             </div>
 
-                            {/* 연결 정보 */}
+                            {/* 연결 정보 - 회사/담당자/거래 */}
                             <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
                               {companyName && (
                                 <span className="flex items-center gap-1">
-                                  <Building2 size={14} />
+                                  <Building2 size={14} className="text-blue-500" />
                                   {companyName}
                                 </span>
                               )}
                               {contactName && (
                                 <span className="flex items-center gap-1">
-                                  <User size={14} />
+                                  <User size={14} className="text-green-500" />
                                   {contactName}
                                 </span>
                               )}
                               {dealName && (
                                 <span className="flex items-center gap-1">
-                                  <Briefcase size={14} />
+                                  <Briefcase size={14} className="text-purple-500" />
                                   {dealName}
                                 </span>
                               )}
@@ -310,27 +309,27 @@ export default function ActivityTimelinePage() {
                           </div>
                         </div>
 
-                        {/* AI 요약 */}
-                        {activity.aiSummary ? (
-                          <div className="bg-white/80 rounded-lg p-4 border border-gray-100">
+                        {/* 내용 표시 */}
+                        {activity.body && (
+                          <div className="bg-white/50 rounded-lg p-3 text-sm text-gray-700 mb-3">
+                            <div
+                              dangerouslySetInnerHTML={{
+                                __html: activity.body.substring(0, 500) + (activity.body.length > 500 ? '...' : '')
+                              }}
+                              className="prose prose-sm max-w-none"
+                            />
+                          </div>
+                        )}
+
+                        {/* AI 인사이트 */}
+                        {activity.aiSummary && (
+                          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
                             <div className="flex items-center gap-1 text-xs text-purple-600 mb-2">
                               <Sparkles size={12} />
-                              <span className="font-medium">AI 요약</span>
+                              <span className="font-medium">AI 인사이트</span>
                             </div>
                             <p className="text-gray-800 leading-relaxed">{activity.aiSummary}</p>
                           </div>
-                        ) : (
-                          // AI 요약이 없을 때 원본 내용 표시
-                          activity.body && (
-                            <div className="bg-white/50 rounded-lg p-3 text-sm text-gray-600">
-                              <div
-                                dangerouslySetInnerHTML={{
-                                  __html: activity.body.substring(0, 300) + (activity.body.length > 300 ? '...' : '')
-                                }}
-                                className="prose prose-sm max-w-none"
-                              />
-                            </div>
-                          )
                         )}
                       </div>
                     )

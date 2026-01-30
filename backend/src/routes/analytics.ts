@@ -289,8 +289,7 @@ router.get('/activity-summary', async (req: Request, res: Response) => {
 // 활동 타임라인 (날짜 범위 기반) - 회사 연결 정보 포함
 router.get('/activity-timeline', async (req: Request, res: Response) => {
   try {
-    const { from, to, generateSummaries, includeAssociations } = req.query;
-    const shouldIncludeAssociations = includeAssociations === 'true' || generateSummaries === 'true';
+    const { from, to, generateSummaries } = req.query;
 
     // 기본값: 2주 전 ~ 2주 후
     const now = new Date();
@@ -431,21 +430,26 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       console.error('Error fetching emails for timeline:', error);
     }
 
-    // Association 조회 (필요한 경우에만, 병렬 처리)
-    if (shouldIncludeAssociations && activities.length > 0) {
+    // Association 조회 (항상 조회, 병렬 처리로 속도 개선)
+    if (activities.length > 0) {
       console.log(`Fetching associations for ${activities.length} activities...`);
-      const associationPromises = activities.map(async (activity) => {
-        const objectType = activity.type === 'call' ? 'calls' :
-                          activity.type === 'note' ? 'notes' :
-                          activity.type === 'meeting' ? 'meetings' : 'emails';
-        try {
-          const assoc = await hubspotClient.getActivityAssociations(objectType, activity.id);
-          activity.associations = assoc;
-        } catch (e) {
-          // 개별 association 조회 실패 시 무시
-        }
-      });
-      await Promise.all(associationPromises);
+      // 병렬 처리하되 동시 요청 수 제한 (10개씩)
+      const batchSize = 10;
+      for (let i = 0; i < activities.length; i += batchSize) {
+        const batch = activities.slice(i, i + batchSize);
+        const associationPromises = batch.map(async (activity) => {
+          const objectType = activity.type === 'call' ? 'calls' :
+                            activity.type === 'note' ? 'notes' :
+                            activity.type === 'meeting' ? 'meetings' : 'emails';
+          try {
+            const assoc = await hubspotClient.getActivityAssociations(objectType, activity.id);
+            activity.associations = assoc;
+          } catch (e) {
+            // 개별 association 조회 실패 시 무시
+          }
+        });
+        await Promise.all(associationPromises);
+      }
     }
 
     // AI 요약 생성
