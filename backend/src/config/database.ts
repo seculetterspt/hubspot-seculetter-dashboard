@@ -228,6 +228,19 @@ export async function initDatabase(): Promise<void> {
         UNIQUE(forecast_date, period_type, period_value)
       );
 
+      -- 일별 raw 데이터 스냅샷 (비교용)
+      CREATE TABLE IF NOT EXISTS daily_raw_snapshot (
+        id SERIAL PRIMARY KEY,
+        snapshot_date DATE NOT NULL,
+        snapshot_time TIME NOT NULL DEFAULT '07:00:00',
+        contacts JSONB DEFAULT '[]',
+        companies JSONB DEFAULT '[]',
+        deals JSONB DEFAULT '[]',
+        tickets JSONB DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(snapshot_date)
+      );
+
       -- 인덱스 생성
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_date ON deal_stage_changes(changed_at);
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_deal ON deal_stage_changes(deal_id);

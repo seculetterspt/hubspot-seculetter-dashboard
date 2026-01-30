@@ -171,6 +171,10 @@ router.get('/today-modified', async (req: Request, res: Response) => {
 
 // 어제 vs 오늘 스냅샷 비교
 router.get('/daily-comparison', async (req: Request, res: Response) => {
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
   // 오늘 실제 데이터 가져오기
   let todayContacts: any[] = [];
   let todayCompanies: any[] = [];
@@ -238,55 +242,83 @@ router.get('/daily-comparison', async (req: Request, res: Response) => {
     console.error('Error fetching tickets:', error);
   }
 
-  // 어제 더미 데이터 생성 (오늘 데이터 기준으로 약간 변형)
-  const generateYesterdayDummy = (todayData: any[], type: string) => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString();
+  // 어제 스냅샷을 DB에서 조회
+  let yesterdayContacts: any[] = [];
+  let yesterdayCompanies: any[] = [];
+  let yesterdayDeals: any[] = [];
+  let yesterdayTickets: any[] = [];
+  let isYesterdayRealData = false;
 
-    // 오늘 데이터에서 일부 제거 (새로 추가된 것처럼)
-    const removedCount = Math.floor(todayData.length * 0.1); // 10% 새로 추가됨
-    const yesterdayData = todayData.slice(removedCount).map(item => ({
-      ...item,
-      modifiedAt: yesterdayStr
-    }));
+  const yesterdaySnapshot = await dailySnapshotService.getRawSnapshot(yesterday);
 
-    return yesterdayData;
-  };
+  if (yesterdaySnapshot) {
+    // DB에서 실제 어제 데이터 사용
+    yesterdayContacts = yesterdaySnapshot.contacts;
+    yesterdayCompanies = yesterdaySnapshot.companies;
+    yesterdayDeals = yesterdaySnapshot.deals;
+    yesterdayTickets = yesterdaySnapshot.tickets;
+    isYesterdayRealData = true;
+    console.log('Using real yesterday snapshot from DB');
+  } else {
+    // 더미 데이터 생성 (fallback)
+    console.log('No yesterday snapshot in DB, using dummy data');
+    const generateYesterdayDummy = (todayData: any[]) => {
+      const removedCount = Math.floor(todayData.length * 0.1);
+      return todayData.slice(removedCount).map(item => ({
+        ...item,
+        modifiedAt: yesterday.toISOString()
+      }));
+    };
+    yesterdayContacts = generateYesterdayDummy(todayContacts);
+    yesterdayCompanies = generateYesterdayDummy(todayCompanies);
+    yesterdayDeals = generateYesterdayDummy(todayDeals);
+    yesterdayTickets = generateYesterdayDummy(todayTickets);
+  }
 
-  const yesterdayContacts = generateYesterdayDummy(todayContacts, 'contacts');
-  const yesterdayCompanies = generateYesterdayDummy(todayCompanies, 'companies');
-  const yesterdayDeals = generateYesterdayDummy(todayDeals, 'deals');
-  const yesterdayTickets = generateYesterdayDummy(todayTickets, 'tickets');
+  // 변화 계산 (실제 변경 감지)
+  const calculateChanges = (today: any[], yesterday: any[], keyField: string = 'id') => {
+    const todayMap = new Map(today.map(i => [i[keyField], i]));
+    const yesterdayMap = new Map(yesterday.map(i => [i[keyField], i]));
 
-  // 변화 계산
-  const calculateChanges = (today: any[], yesterday: any[]) => {
-    const todayIds = new Set(today.map(i => i.id));
-    const yesterdayIds = new Set(yesterday.map(i => i.id));
+    const added = today.filter(i => !yesterdayMap.has(i[keyField]));
+    const removed = yesterday.filter(i => !todayMap.has(i[keyField]));
 
-    const added = today.filter(i => !yesterdayIds.has(i.id));
-    const removed = yesterday.filter(i => !todayIds.has(i.id));
-    const common = today.filter(i => yesterdayIds.has(i.id));
+    // 실제 수정 감지: 같은 ID인데 modifiedAt이 다른 항목
+    const modified: any[] = [];
+    const unchanged: any[] = [];
+
+    today.forEach(item => {
+      const yesterdayItem = yesterdayMap.get(item[keyField]);
+      if (yesterdayItem) {
+        // modifiedAt 비교로 실제 수정 여부 판단
+        const todayMod = item.modifiedAt || '';
+        const yesterdayMod = yesterdayItem.modifiedAt || '';
+        if (todayMod !== yesterdayMod) {
+          modified.push({ today: item, yesterday: yesterdayItem });
+        } else {
+          unchanged.push(item);
+        }
+      }
+    });
 
     return {
       added: added.length,
       removed: removed.length,
-      modified: Math.floor(common.length * 0.2), // 가정: 공통 항목 중 20%가 수정됨
-      unchanged: common.length - Math.floor(common.length * 0.2),
+      modified: modified.length,
+      unchanged: unchanged.length,
       addedItems: added,
-      removedItems: removed
+      removedItems: removed,
+      modifiedItems: modified
     };
   };
-
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
 
   res.json({
     dates: {
       today: today.toISOString().split('T')[0],
       yesterday: yesterday.toISOString().split('T')[0]
     },
+    isYesterdayRealData,
+    dataSource: isYesterdayRealData ? '실제 스냅샷 (DB)' : '테스트용 더미 데이터',
     summary: {
       contacts: {
         today: todayContacts.length,
@@ -294,7 +326,7 @@ router.get('/daily-comparison', async (req: Request, res: Response) => {
         change: todayContacts.length - yesterdayContacts.length,
         changePercent: yesterdayContacts.length > 0
           ? ((todayContacts.length - yesterdayContacts.length) / yesterdayContacts.length * 100).toFixed(1)
-          : 0
+          : '0'
       },
       companies: {
         today: todayCompanies.length,
@@ -302,7 +334,7 @@ router.get('/daily-comparison', async (req: Request, res: Response) => {
         change: todayCompanies.length - yesterdayCompanies.length,
         changePercent: yesterdayCompanies.length > 0
           ? ((todayCompanies.length - yesterdayCompanies.length) / yesterdayCompanies.length * 100).toFixed(1)
-          : 0
+          : '0'
       },
       deals: {
         today: todayDeals.length,
@@ -310,7 +342,7 @@ router.get('/daily-comparison', async (req: Request, res: Response) => {
         change: todayDeals.length - yesterdayDeals.length,
         changePercent: yesterdayDeals.length > 0
           ? ((todayDeals.length - yesterdayDeals.length) / yesterdayDeals.length * 100).toFixed(1)
-          : 0,
+          : '0',
         todayValue: todayDeals.reduce((sum, d) => sum + (d.amount || 0), 0),
         yesterdayValue: yesterdayDeals.reduce((sum, d) => sum + (d.amount || 0), 0)
       },
@@ -320,7 +352,7 @@ router.get('/daily-comparison', async (req: Request, res: Response) => {
         change: todayTickets.length - yesterdayTickets.length,
         changePercent: yesterdayTickets.length > 0
           ? ((todayTickets.length - yesterdayTickets.length) / yesterdayTickets.length * 100).toFixed(1)
-          : 0
+          : '0'
       }
     },
     details: {

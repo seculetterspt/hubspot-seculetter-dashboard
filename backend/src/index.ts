@@ -64,6 +64,22 @@ app.post('/api/sync', async (req, res) => {
   }
 });
 
+// Manual raw snapshot save (for testing)
+app.post('/api/save-snapshot', async (req, res) => {
+  try {
+    const targetDate = req.body.date ? new Date(req.body.date) : new Date();
+    await dailySnapshotService.saveRawSnapshot(targetDate);
+    res.json({
+      success: true,
+      message: `Raw snapshot saved for ${targetDate.toISOString().split('T')[0]}`,
+      date: targetDate.toISOString().split('T')[0]
+    });
+  } catch (error) {
+    console.error('Save snapshot error:', error);
+    res.status(500).json({ error: 'Save snapshot failed' });
+  }
+});
+
 // Initialize and start server
 async function start() {
   try {
@@ -75,15 +91,22 @@ async function start() {
       console.log('Running without database (demo mode)');
     }
 
-    // Schedule daily snapshot at midnight
-    cron.schedule('0 0 * * *', async () => {
-      console.log('Running daily snapshot...');
+    // Schedule daily snapshot at 7 AM KST (22:00 UTC previous day)
+    // Cron: minute hour day month weekday
+    // 0 22 * * * = 22:00 UTC = 07:00 KST next day
+    cron.schedule('0 22 * * *', async () => {
+      console.log('Running daily snapshot at 7 AM KST...');
       try {
+        const now = new Date();
+        // UTC 22:00 = KST 다음날 07:00
+        const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간 = KST
+
         const snapshot = await dailySnapshotService.generateSnapshot();
         if (process.env.DATABASE_URL) {
-          await dailySnapshotService.saveSnapshot(new Date(), snapshot);
+          await dailySnapshotService.saveSnapshot(kstDate, snapshot);
+          await dailySnapshotService.saveRawSnapshot(kstDate);
         }
-        console.log('Daily snapshot completed');
+        console.log('Daily snapshot completed for', kstDate.toISOString().split('T')[0]);
       } catch (error) {
         console.error('Daily snapshot failed:', error);
       }

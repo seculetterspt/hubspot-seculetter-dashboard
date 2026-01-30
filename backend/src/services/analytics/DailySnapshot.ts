@@ -406,6 +406,115 @@ export class DailySnapshotService {
       }
     };
   }
+
+  // Raw 데이터 스냅샷 저장 (비교용)
+  async saveRawSnapshot(date: Date): Promise<void> {
+    const dateStr = date.toISOString().split('T')[0];
+    const timeStr = date.toTimeString().split(' ')[0];
+
+    // 오늘 raw 데이터 가져오기
+    let contacts: any[] = [];
+    let companies: any[] = [];
+    let deals: any[] = [];
+    let tickets: any[] = [];
+
+    try {
+      const contactsRes = await hubspotClient.getContacts(100);
+      contacts = contactsRes.results.map(c => ({
+        id: c.id,
+        name: `${c.properties.firstname || ''} ${c.properties.lastname || ''}`.trim() || '(이름 없음)',
+        email: c.properties.email || '-',
+        company: c.properties.company || '-',
+        lifecycleStage: c.properties.lifecyclestage || '-',
+        source: c.properties.hs_analytics_source || '-',
+        modifiedAt: c.properties.lastmodifieddate,
+        createdAt: c.properties.createdate
+      }));
+    } catch (error) {
+      console.error('Error fetching contacts for raw snapshot:', error);
+    }
+
+    try {
+      const companiesRes = await hubspotClient.getCompanies(100);
+      companies = companiesRes.results.map(c => ({
+        id: c.id,
+        name: c.properties.name || '(이름 없음)',
+        domain: c.properties.domain || '-',
+        industry: c.properties.industry || '-',
+        employees: c.properties.numberofemployees || '-',
+        modifiedAt: c.properties.lastmodifieddate,
+        createdAt: c.properties.createdate
+      }));
+    } catch (error) {
+      console.error('Error fetching companies for raw snapshot:', error);
+    }
+
+    try {
+      const dealsRes = await hubspotClient.getDeals(100);
+      deals = dealsRes.results.map(d => ({
+        id: d.id,
+        name: d.properties.dealname || '(이름 없음)',
+        amount: d.properties.amount ? Number(d.properties.amount) : 0,
+        stage: d.properties.dealstage || '-',
+        pipeline: d.properties.pipeline || '-',
+        closeDate: d.properties.closedate || '-',
+        modifiedAt: d.properties.hs_lastmodifieddate,
+        createdAt: d.properties.createdate
+      }));
+    } catch (error) {
+      console.error('Error fetching deals for raw snapshot:', error);
+    }
+
+    try {
+      const ticketsRes = await hubspotClient.getTickets(100);
+      tickets = ticketsRes.results.map(t => ({
+        id: t.id,
+        subject: t.properties.subject || '(제목 없음)',
+        priority: t.properties.hs_ticket_priority || '-',
+        status: t.properties.hs_pipeline_stage || '-',
+        modifiedAt: t.properties.hs_lastmodifieddate,
+        createdAt: t.properties.createdate
+      }));
+    } catch (error) {
+      console.error('Error fetching tickets for raw snapshot:', error);
+    }
+
+    // DB에 저장
+    try {
+      await pool.query(`
+        INSERT INTO daily_raw_snapshot (snapshot_date, snapshot_time, contacts, companies, deals, tickets)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (snapshot_date) DO UPDATE SET
+        snapshot_time = $2, contacts = $3, companies = $4, deals = $5, tickets = $6
+      `, [dateStr, timeStr, JSON.stringify(contacts), JSON.stringify(companies), JSON.stringify(deals), JSON.stringify(tickets)]);
+      console.log(`Raw snapshot saved for ${dateStr} at ${timeStr}`);
+    } catch (error) {
+      console.error('Error saving raw snapshot:', error);
+    }
+  }
+
+  // 특정 날짜의 raw 스냅샷 조회
+  async getRawSnapshot(date: Date): Promise<{ contacts: any[]; companies: any[]; deals: any[]; tickets: any[] } | null> {
+    const dateStr = date.toISOString().split('T')[0];
+    try {
+      const result = await pool.query(
+        'SELECT contacts, companies, deals, tickets FROM daily_raw_snapshot WHERE snapshot_date = $1',
+        [dateStr]
+      );
+      if (result.rows.length > 0) {
+        return {
+          contacts: result.rows[0].contacts || [],
+          companies: result.rows[0].companies || [],
+          deals: result.rows[0].deals || [],
+          tickets: result.rows[0].tickets || []
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching raw snapshot:', error);
+      return null;
+    }
+  }
 }
 
 export const dailySnapshotService = new DailySnapshotService();

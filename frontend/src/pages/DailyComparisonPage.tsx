@@ -7,6 +7,8 @@ interface ComparisonData {
     today: string
     yesterday: string
   }
+  isYesterdayRealData: boolean
+  dataSource: string
   summary: {
     contacts: { today: number; yesterday: number; change: number; changePercent: string }
     companies: { today: number; yesterday: number; change: number; changePercent: string }
@@ -14,10 +16,10 @@ interface ComparisonData {
     tickets: { today: number; yesterday: number; change: number; changePercent: string }
   }
   details: {
-    contacts: { added: number; removed: number; modified: number; unchanged: number; addedItems: any[]; removedItems: any[] }
-    companies: { added: number; removed: number; modified: number; unchanged: number; addedItems: any[]; removedItems: any[] }
-    deals: { added: number; removed: number; modified: number; unchanged: number; addedItems: any[]; removedItems: any[] }
-    tickets: { added: number; removed: number; modified: number; unchanged: number; addedItems: any[]; removedItems: any[] }
+    contacts: { added: number; removed: number; modified: number; unchanged: number; addedItems: any[]; removedItems: any[]; modifiedItems?: any[] }
+    companies: { added: number; removed: number; modified: number; unchanged: number; addedItems: any[]; removedItems: any[]; modifiedItems?: any[] }
+    deals: { added: number; removed: number; modified: number; unchanged: number; addedItems: any[]; removedItems: any[]; modifiedItems?: any[] }
+    tickets: { added: number; removed: number; modified: number; unchanged: number; addedItems: any[]; removedItems: any[]; modifiedItems?: any[] }
   }
   data: {
     today: { contacts: any[]; companies: any[]; deals: any[]; tickets: any[] }
@@ -103,9 +105,18 @@ export default function DailyComparisonPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">일별 데이터 비교</h1>
-          <p className="text-gray-500 mt-1">
-            {data.dates.yesterday} vs {data.dates.today} (어제 데이터는 테스트용 더미)
-          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-gray-500">
+              {data.dates.yesterday} vs {data.dates.today}
+            </p>
+            <span className={`px-2 py-0.5 text-xs rounded-full ${
+              data.isYesterdayRealData
+                ? 'bg-green-100 text-green-700'
+                : 'bg-yellow-100 text-yellow-700'
+            }`}>
+              {data.dataSource}
+            </span>
+          </div>
         </div>
         <button
           onClick={fetchData}
