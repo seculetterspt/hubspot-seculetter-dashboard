@@ -56,6 +56,14 @@ export const analyticsApi = {
     const queryString = params.toString()
     return api.get(`/analytics/deal-summary${queryString ? `?${queryString}` : ''}`)
   },
+  getDealRecentActivities: (year?: number, pipelineId?: string, days?: number) => {
+    const params = new URLSearchParams()
+    if (year) params.append('year', year.toString())
+    if (pipelineId) params.append('pipelineId', pipelineId)
+    if (days) params.append('days', days.toString())
+    const queryString = params.toString()
+    return api.get(`/analytics/deal-recent-activities${queryString ? `?${queryString}` : ''}`)
+  },
 }
 
 export default api
