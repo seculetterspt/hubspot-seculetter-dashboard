@@ -453,7 +453,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       }
     }
 
-    // AI 요약 생성
+    // AI 요약 생성 (DB 캐싱 적용)
     if (generateSummaries === 'true' && activities.length > 0) {
       try {
         const activitiesForSummary = activities.map(a => ({
@@ -468,7 +468,8 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           dealName: a.associations.deals[0]?.name,
         }));
 
-        const summaries = await summaryService.summarizeActivitiesWithContext(activitiesForSummary);
+        // DB에서 기존 요약 조회 후 없는 것만 새로 생성하고 저장
+        const summaries = await summaryService.generateAndSaveSummaries(activitiesForSummary);
 
         activities.forEach(a => {
           a.aiSummary = summaries.get(a.id);

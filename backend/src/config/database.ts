@@ -241,11 +241,28 @@ export async function initDatabase(): Promise<void> {
         UNIQUE(snapshot_date)
       );
 
+      -- 활동 AI 요약 저장
+      CREATE TABLE IF NOT EXISTS activity_summaries (
+        id SERIAL PRIMARY KEY,
+        activity_id VARCHAR(50) NOT NULL,
+        activity_type VARCHAR(20) NOT NULL,
+        activity_date DATE NOT NULL,
+        company_name VARCHAR(255),
+        contact_name VARCHAR(255),
+        deal_name VARCHAR(255),
+        ai_summary TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(activity_id)
+      );
+
       -- 인덱스 생성
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_date ON deal_stage_changes(changed_at);
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_deal ON deal_stage_changes(deal_id);
       CREATE INDEX IF NOT EXISTS idx_sync_jobs_status ON sync_jobs(status);
       CREATE INDEX IF NOT EXISTS idx_stalled_deals_days ON stalled_deals(days_stalled);
+      CREATE INDEX IF NOT EXISTS idx_activity_summaries_date ON activity_summaries(activity_date);
+      CREATE INDEX IF NOT EXISTS idx_activity_summaries_activity ON activity_summaries(activity_id);
     `);
     console.log('Database initialized successfully');
   } finally {

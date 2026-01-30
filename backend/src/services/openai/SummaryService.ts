@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { pool } from '../../config/database.js';
 
 interface Activity {
   id: string;
@@ -340,6 +341,121 @@ ${activitiesForPrompt}
     }
 
     return text || '활동 데이터가 없습니다.';
+  }
+
+  // DB에서 저장된 요약 조회
+  async getSavedSummaries(activityIds: string[]): Promise<Map<string, string>> {
+    const summaries = new Map<string, string>();
+
+    if (!activityIds || activityIds.length === 0) {
+      return summaries;
+    }
+
+    try {
+      const placeholders = activityIds.map((_, i) => `$${i + 1}`).join(', ');
+      const result = await pool.query(
+        `SELECT activity_id, ai_summary FROM activity_summaries WHERE activity_id IN (${placeholders})`,
+        activityIds
+      );
+
+      for (const row of result.rows) {
+        if (row.ai_summary) {
+          summaries.set(row.activity_id, row.ai_summary);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching saved summaries:', error);
+    }
+
+    return summaries;
+  }
+
+  // DB에 요약 저장
+  async saveSummaries(activities: ActivityWithContext[], summaries: Map<string, string>): Promise<void> {
+    if (summaries.size === 0) {
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      for (const activity of activities) {
+        const summary = summaries.get(activity.id);
+        if (!summary) continue;
+
+        await client.query(
+          `INSERT INTO activity_summaries
+           (activity_id, activity_type, activity_date, company_name, contact_name, deal_name, ai_summary, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+           ON CONFLICT (activity_id)
+           DO UPDATE SET
+             ai_summary = EXCLUDED.ai_summary,
+             company_name = EXCLUDED.company_name,
+             contact_name = EXCLUDED.contact_name,
+             deal_name = EXCLUDED.deal_name,
+             updated_at = CURRENT_TIMESTAMP`,
+          [
+            activity.id,
+            activity.type,
+            activity.date,
+            activity.companyName || null,
+            activity.contactName || null,
+            activity.dealName || null,
+            summary
+          ]
+        );
+      }
+
+      await client.query('COMMIT');
+      console.log(`Saved ${summaries.size} summaries to database`);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error saving summaries to database:', error);
+    } finally {
+      client.release();
+    }
+  }
+
+  // 요약이 없는 활동만 필터링하여 새로 생성 후 저장
+  async generateAndSaveSummaries(activities: ActivityWithContext[]): Promise<Map<string, string>> {
+    const allSummaries = new Map<string, string>();
+
+    if (!activities || activities.length === 0) {
+      return allSummaries;
+    }
+
+    // 1. 이미 저장된 요약 조회
+    const activityIds = activities.map(a => a.id);
+    const savedSummaries = await this.getSavedSummaries(activityIds);
+
+    // 저장된 요약 추가
+    for (const [id, summary] of savedSummaries) {
+      allSummaries.set(id, summary);
+    }
+
+    // 2. 요약이 없는 활동만 필터링
+    const activitiesNeedingSummary = activities.filter(a => !savedSummaries.has(a.id));
+
+    if (activitiesNeedingSummary.length === 0) {
+      console.log(`All ${activities.length} activities already have saved summaries`);
+      return allSummaries;
+    }
+
+    console.log(`Generating summaries for ${activitiesNeedingSummary.length} activities (${savedSummaries.size} already cached)`);
+
+    // 3. 새로운 요약 생성
+    const newSummaries = await this.summarizeActivitiesWithContext(activitiesNeedingSummary);
+
+    // 새 요약 추가
+    for (const [id, summary] of newSummaries) {
+      allSummaries.set(id, summary);
+    }
+
+    // 4. DB에 저장
+    await this.saveSummaries(activitiesNeedingSummary, newSummaries);
+
+    return allSummaries;
   }
 }
 
