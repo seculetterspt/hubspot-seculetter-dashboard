@@ -276,28 +276,45 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
     await delay(500); // Rate Limit 방지
 
     // 활동별 Association 조회 (딜, 회사) - Rate Limit 방지를 위해 순차 처리
-    const batchSize = 5; // 배치 크기 줄임
+    console.log(`Fetching associations for ${activities.length} activities...`);
+    const batchSize = 3; // 배치 크기 더 줄임
     for (let i = 0; i < activities.length; i += batchSize) {
       const batch = activities.slice(i, i + batchSize);
       for (const activity of batch) {
         const objectType = activity.type === 'call' ? 'calls' :
                           activity.type === 'note' ? 'notes' :
                           activity.type === 'meeting' ? 'meetings' : 'emails';
-        try {
-          const assoc = await hubspotClient.getActivityAssociations(objectType, activity.id);
-          if (assoc.deals && assoc.deals.length > 0) {
-            activity.dealId = assoc.deals[0].id;
-            activity.dealName = assoc.deals[0].name;
+
+        // 재시도 로직 (최대 3회)
+        for (let retry = 0; retry < 3; retry++) {
+          try {
+            const assoc = await hubspotClient.getActivityAssociations(objectType, activity.id);
+            if (assoc.deals && assoc.deals.length > 0) {
+              activity.dealId = assoc.deals[0].id;
+              activity.dealName = assoc.deals[0].name;
+              console.log(`Activity ${activity.id} (${activity.type}) -> Deal: ${activity.dealName}`);
+            }
+            if (assoc.companies && assoc.companies.length > 0) {
+              activity.companyId = assoc.companies[0].id;
+              activity.companyName = assoc.companies[0].name;
+            }
+            break; // 성공하면 루프 종료
+          } catch (e: any) {
+            if (e.code === 429 && retry < 2) {
+              // Rate Limit 에러면 대기 후 재시도
+              console.log(`Rate limit hit for activity ${activity.id}, waiting...`);
+              await delay(2000 * (retry + 1));
+            } else {
+              console.log(`Failed to get associations for activity ${activity.id}: ${e.message || e}`);
+              break;
+            }
           }
-          if (assoc.companies && assoc.companies.length > 0) {
-            activity.companyId = assoc.companies[0].id;
-            activity.companyName = assoc.companies[0].name;
-          }
-        } catch (e) { /* ignore */ }
-        await delay(200); // 각 요청 사이 딜레이
+        }
+        await delay(300); // 각 요청 사이 딜레이 증가
       }
-      await delay(1000); // 배치 사이 딜레이
+      await delay(1500); // 배치 사이 딜레이 증가
     }
+    console.log(`Activities with deals: ${activities.filter(a => a.dealId).length}`);
 
     // 파이프라인 및 딜 정보 조회
     const pipelines = await hubspotClient.getDealPipelines();
