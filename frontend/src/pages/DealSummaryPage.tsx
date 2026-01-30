@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, ExternalLink, ChevronLeft, ChevronRight, TrendingUp, DollarSign, Target, Calendar, User } from 'lucide-react'
+import { RefreshCw, ExternalLink, ChevronLeft, ChevronRight, TrendingUp, DollarSign, Target, Calendar, User, Sparkles, Building2, Phone, FileText, Mail } from 'lucide-react'
 import { analyticsApi } from '../services/api'
 
 // HubSpot Portal ID
@@ -58,6 +58,30 @@ interface DealSummaryData {
   }
 }
 
+interface RecentActivity {
+  type: 'call' | 'note' | 'meeting' | 'email'
+  title: string
+  date: string
+}
+
+interface DealRecentActivity {
+  dealId: string
+  dealName: string
+  companyName: string
+  stageName: string
+  amount: number
+  activityCount: number
+  latestActivityDate: string
+  aiSummary: string
+  activities: RecentActivity[]
+}
+
+interface DealRecentActivitiesData {
+  dateRange: { from: string; to: string }
+  totalDeals: number
+  deals: DealRecentActivity[]
+}
+
 // 금액 포맷 함수 (억/만원 단위)
 const formatAmount = (amount: number): string => {
   if (amount >= 100000000) {
@@ -98,7 +122,9 @@ const getStageHeaderColor = (probability: number): string => {
 
 export default function DealSummaryPage() {
   const [data, setData] = useState<DealSummaryData | null>(null)
+  const [recentActivities, setRecentActivities] = useState<DealRecentActivitiesData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activitiesLoading, setActivitiesLoading] = useState(false)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null)
 
@@ -118,9 +144,27 @@ export default function DealSummaryPage() {
     }
   }
 
+  const fetchRecentActivities = async (pipelineId?: string) => {
+    setActivitiesLoading(true)
+    try {
+      const res = await analyticsApi.getDealRecentActivities(selectedYear, pipelineId, 14)
+      setRecentActivities(res.data)
+    } catch (error) {
+      console.error('Error fetching recent activities:', error)
+    } finally {
+      setActivitiesLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchData()
   }, [selectedYear])
+
+  useEffect(() => {
+    if (selectedPipeline) {
+      fetchRecentActivities(selectedPipeline)
+    }
+  }, [selectedPipeline, selectedYear])
 
   const currentPipeline = data?.pipelines.find(p => p.id === selectedPipeline)
 
@@ -339,6 +383,118 @@ export default function DealSummaryPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 최근 2주간 주요 활동 업데이트 */}
+      {currentPipeline && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">최근 2주간 주요 활동 업데이트</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {recentActivities?.dateRange?.from} ~ {recentActivities?.dateRange?.to} |
+                {recentActivities?.totalDeals || 0}개 딜에서 활동 발생
+              </p>
+            </div>
+            {activitiesLoading && (
+              <div className="flex items-center gap-2 text-purple-600">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                <span className="text-sm">AI 분석 중...</span>
+              </div>
+            )}
+          </div>
+
+          {recentActivities && recentActivities.deals.length > 0 ? (
+            <div className="space-y-4">
+              {recentActivities.deals.map(deal => (
+                <div
+                  key={deal.dealId}
+                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start gap-4">
+                    {/* 회사/딜 정보 */}
+                    <div className="flex-shrink-0 w-48">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Building2 size={16} className="text-blue-500" />
+                        <span className="font-semibold text-gray-900 truncate">
+                          {deal.companyName || '(회사명 없음)'}
+                        </span>
+                      </div>
+                      <a
+                        href={getHubspotDealUrl(deal.dealId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        {deal.dealName}
+                        <ExternalLink size={12} />
+                      </a>
+                      <div className="mt-2 text-xs text-gray-500">
+                        <span className="inline-block bg-gray-100 px-2 py-0.5 rounded mr-2">
+                          {deal.stageName}
+                        </span>
+                        {deal.amount > 0 && (
+                          <span className="text-gray-700 font-medium">
+                            ₩{formatAmount(deal.amount)}
+                          </span>
+                        )}
+                      </div>
+                      {/* 최근 활동 아이콘들 */}
+                      <div className="flex items-center gap-2 mt-2">
+                        {deal.activities.map((activity, idx) => {
+                          const Icon = activity.type === 'call' ? Phone :
+                                      activity.type === 'meeting' ? Calendar :
+                                      activity.type === 'email' ? Mail : FileText
+                          const color = activity.type === 'call' ? 'text-blue-500' :
+                                       activity.type === 'meeting' ? 'text-purple-500' :
+                                       activity.type === 'email' ? 'text-orange-500' : 'text-green-500'
+                          return (
+                            <div key={idx} className={`${color}`} title={`${activity.title} (${activity.date})`}>
+                              <Icon size={14} />
+                            </div>
+                          )
+                        })}
+                        {deal.activityCount > 3 && (
+                          <span className="text-xs text-gray-400">+{deal.activityCount - 3}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* AI 요약 */}
+                    <div className="flex-1">
+                      {deal.aiSummary ? (
+                        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-100">
+                          <div className="flex items-center gap-1 text-xs text-purple-600 mb-2">
+                            <Sparkles size={12} />
+                            <span className="font-medium">AI 요약</span>
+                          </div>
+                          <p className="text-gray-800 text-sm leading-relaxed">{deal.aiSummary}</p>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 rounded-lg p-4 text-gray-500 text-sm">
+                          요약 생성 중...
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 날짜 */}
+                    <div className="flex-shrink-0 text-right text-xs text-gray-400">
+                      <div>최근 활동</div>
+                      <div className="font-medium text-gray-600">
+                        {formatDate(deal.latestActivityDate)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !activitiesLoading ? (
+            <div className="text-center text-gray-500 py-12">
+              <Calendar size={48} className="mx-auto mb-4 opacity-50" />
+              <p>최근 2주간 활동이 있는 딜이 없습니다</p>
+            </div>
+          ) : null}
         </div>
       )}
 
