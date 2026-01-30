@@ -7,13 +7,21 @@ const router = Router();
 
 // 오늘 수정된 데이터 (오브젝트별 테이블)
 router.get('/today-modified', async (req: Request, res: Response) => {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-    // 연락처
+  let modifiedContacts: any[] = [];
+  let modifiedCompanies: any[] = [];
+  let modifiedDeals: any[] = [];
+  let modifiedTickets: any[] = [];
+  let todayMeetings: any[] = [];
+  let todayCalls: any[] = [];
+  let todayNotes: any[] = [];
+
+  // 연락처 (개별 에러 처리)
+  try {
     const contactsRes = await hubspotClient.getContacts(100);
-    const modifiedContacts = contactsRes.results
+    modifiedContacts = contactsRes.results
       .filter(c => {
         const modDate = c.properties.lastmodifieddate ? new Date(c.properties.lastmodifieddate) : null;
         return modDate && modDate >= today;
@@ -28,10 +36,14 @@ router.get('/today-modified', async (req: Request, res: Response) => {
         modifiedAt: c.properties.lastmodifieddate,
         createdAt: c.properties.createdate
       }));
+  } catch (error) {
+    console.error('Error fetching contacts:', error);
+  }
 
-    // 회사
+  // 회사 (개별 에러 처리)
+  try {
     const companiesRes = await hubspotClient.getCompanies(100);
-    const modifiedCompanies = companiesRes.results
+    modifiedCompanies = companiesRes.results
       .filter(c => {
         const modDate = c.properties.lastmodifieddate ? new Date(c.properties.lastmodifieddate) : null;
         return modDate && modDate >= today;
@@ -45,10 +57,14 @@ router.get('/today-modified', async (req: Request, res: Response) => {
         modifiedAt: c.properties.lastmodifieddate,
         createdAt: c.properties.createdate
       }));
+  } catch (error) {
+    console.error('Error fetching companies:', error);
+  }
 
-    // 거래
+  // 거래 (개별 에러 처리)
+  try {
     const dealsRes = await hubspotClient.getDeals(100);
-    const modifiedDeals = dealsRes.results
+    modifiedDeals = dealsRes.results
       .filter(d => {
         const modDate = d.properties.hs_lastmodifieddate ? new Date(d.properties.hs_lastmodifieddate) : null;
         return modDate && modDate >= today;
@@ -63,10 +79,14 @@ router.get('/today-modified', async (req: Request, res: Response) => {
         modifiedAt: d.properties.hs_lastmodifieddate,
         createdAt: d.properties.createdate
       }));
+  } catch (error) {
+    console.error('Error fetching deals:', error);
+  }
 
-    // 티켓
+  // 티켓 (개별 에러 처리)
+  try {
     const ticketsRes = await hubspotClient.getTickets(100);
-    const modifiedTickets = ticketsRes.results
+    modifiedTickets = ticketsRes.results
       .filter(t => {
         const modDate = t.properties.hs_lastmodifieddate ? new Date(t.properties.hs_lastmodifieddate) : null;
         return modDate && modDate >= today;
@@ -79,76 +99,74 @@ router.get('/today-modified', async (req: Request, res: Response) => {
         modifiedAt: t.properties.hs_lastmodifieddate,
         createdAt: t.properties.createdate
       }));
+  } catch (error) {
+    console.error('Error fetching tickets:', error);
+  }
 
-    // 미팅
+  // 미팅 (개별 에러 처리)
+  try {
     const meetingsRes = await hubspotClient.getMeetings(100);
-    const todayMeetings = meetingsRes.results.map(m => ({
+    todayMeetings = meetingsRes.results.map(m => ({
       id: m.id,
       title: m.properties.hs_meeting_title || '(제목 없음)',
       startTime: m.properties.hs_meeting_start_time || '-',
       endTime: m.properties.hs_meeting_end_time || '-',
       outcome: m.properties.hs_meeting_outcome || '-'
     }));
+  } catch (error) {
+    console.error('Error fetching meetings (scope may be missing):', error);
+  }
 
-    // 통화
+  // 통화 (개별 에러 처리)
+  try {
     const callsRes = await hubspotClient.getCalls(100);
-    const todayCalls = callsRes.results.map(c => ({
+    todayCalls = callsRes.results.map(c => ({
       id: c.id,
       title: c.properties.hs_call_title || '(제목 없음)',
       duration: c.properties.hs_call_duration || '-',
       status: c.properties.hs_call_status || '-',
       timestamp: c.properties.hs_timestamp || '-'
     }));
+  } catch (error) {
+    console.error('Error fetching calls (scope may be missing):', error);
+  }
 
-    // 메모
+  // 메모 (개별 에러 처리)
+  try {
     const notesRes = await hubspotClient.getNotes(100);
-    const todayNotes = notesRes.results.map(n => ({
+    todayNotes = notesRes.results.map(n => ({
       id: n.id,
       body: (n.properties.hs_note_body || '').substring(0, 100) + '...',
       timestamp: n.properties.hs_timestamp || '-'
     }));
-
-    res.json({
-      date: today.toISOString().split('T')[0],
-      contacts: {
-        count: modifiedContacts.length,
-        items: modifiedContacts
-      },
-      companies: {
-        count: modifiedCompanies.length,
-        items: modifiedCompanies
-      },
-      deals: {
-        count: modifiedDeals.length,
-        items: modifiedDeals
-      },
-      tickets: {
-        count: modifiedTickets.length,
-        items: modifiedTickets
-      },
-      activities: {
-        meetings: { count: todayMeetings.length, items: todayMeetings },
-        calls: { count: todayCalls.length, items: todayCalls },
-        notes: { count: todayNotes.length, items: todayNotes }
-      }
-    });
-  } catch (error: any) {
-    console.error('Error fetching today modified data:', error);
-    // Return empty data instead of error
-    res.json({
-      date: new Date().toISOString().split('T')[0],
-      error: error.message || 'Unknown error',
-      contacts: { count: 0, items: [] },
-      companies: { count: 0, items: [] },
-      deals: { count: 0, items: [] },
-      tickets: { count: 0, items: [] },
-      activities: {
-        meetings: { count: 0, items: [] },
-        calls: { count: 0, items: [] },
-        notes: { count: 0, items: [] }
-      }
-    });
+  } catch (error) {
+    console.error('Error fetching notes (scope may be missing):', error);
   }
+
+  res.json({
+    date: today.toISOString().split('T')[0],
+    contacts: {
+      count: modifiedContacts.length,
+      items: modifiedContacts
+    },
+    companies: {
+      count: modifiedCompanies.length,
+      items: modifiedCompanies
+    },
+    deals: {
+      count: modifiedDeals.length,
+      items: modifiedDeals
+    },
+    tickets: {
+      count: modifiedTickets.length,
+      items: modifiedTickets
+    },
+    activities: {
+      meetings: { count: todayMeetings.length, items: todayMeetings },
+      calls: { count: todayCalls.length, items: todayCalls },
+      notes: { count: todayNotes.length, items: todayNotes }
+    }
+  });
 });
 
 // 오버뷰 KPI 데이터
