@@ -7,7 +7,7 @@ const router = Router();
 // 오버뷰 KPI 데이터
 router.get('/overview', async (req: Request, res: Response) => {
   try {
-    const snapshot = await dailySnapshotService.getDemoSnapshot();
+    const snapshot = await dailySnapshotService.generateSnapshot();
 
     // Get yesterday's data for comparison
     const yesterdayResult = await pool.query(`
@@ -59,7 +59,7 @@ router.get('/trends', async (req: Request, res: Response) => {
 // 파이프라인 현황
 router.get('/pipeline', async (req: Request, res: Response) => {
   try {
-    const snapshot = await dailySnapshotService.getDemoSnapshot();
+    const snapshot = await dailySnapshotService.generateSnapshot();
 
     const pipeline = {
       stages: [
@@ -240,7 +240,7 @@ router.get('/poc-status', async (req: Request, res: Response) => {
 // 연락처 통계
 router.get('/contacts', async (req: Request, res: Response) => {
   try {
-    const snapshot = await dailySnapshotService.getDemoSnapshot();
+    const snapshot = await dailySnapshotService.generateSnapshot();
     res.json(snapshot.contacts);
   } catch (error) {
     console.error('Error fetching contacts analytics:', error);
@@ -251,7 +251,7 @@ router.get('/contacts', async (req: Request, res: Response) => {
 // 회사 통계
 router.get('/companies', async (req: Request, res: Response) => {
   try {
-    const snapshot = await dailySnapshotService.getDemoSnapshot();
+    const snapshot = await dailySnapshotService.generateSnapshot();
     res.json(snapshot.companies);
   } catch (error) {
     console.error('Error fetching companies analytics:', error);
@@ -262,7 +262,7 @@ router.get('/companies', async (req: Request, res: Response) => {
 // 티켓 통계
 router.get('/tickets', async (req: Request, res: Response) => {
   try {
-    const snapshot = await dailySnapshotService.getDemoSnapshot();
+    const snapshot = await dailySnapshotService.generateSnapshot();
     res.json(snapshot.tickets);
   } catch (error) {
     console.error('Error fetching tickets analytics:', error);
@@ -273,7 +273,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
 // 활동 통계
 router.get('/activities', async (req: Request, res: Response) => {
   try {
-    const snapshot = await dailySnapshotService.getDemoSnapshot();
+    const snapshot = await dailySnapshotService.generateSnapshot();
     res.json(snapshot.activities);
   } catch (error) {
     console.error('Error fetching activities analytics:', error);
