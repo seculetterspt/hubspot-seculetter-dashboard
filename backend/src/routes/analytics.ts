@@ -113,6 +113,32 @@ router.get('/recent-activities', async (req: Request, res: Response) => {
   const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
   const kst24hAgo = new Date(utc24hAgo.getTime() + (9 * 60 * 60 * 1000));
 
+  // 활동별 AI 요약 생성 (쿼리 파라미터로 옵션 처리)
+  const includeSummaries = req.query.includeSummaries === 'true';
+  let activitySummaries: Map<string, string> = new Map();
+
+  if (includeSummaries) {
+    try {
+      const allActivities = [
+        ...calls.map(c => ({ id: c.id, type: 'call' as const, subject: c.title, body: c.body, timestamp: c.timestamp })),
+        ...notes.map(n => ({ id: n.id, type: 'note' as const, body: n.body, timestamp: n.timestamp })),
+        ...meetings.map(m => ({ id: m.id, type: 'meeting' as const, subject: m.title, body: m.body, timestamp: m.startTime })),
+        ...emails.map(e => ({ id: e.id, type: 'email' as const, subject: e.subject, body: e.body, timestamp: e.timestamp })),
+      ];
+      activitySummaries = await summaryService.summarizeIndividualActivities(allActivities);
+    } catch (error) {
+      console.error('Error generating activity summaries:', error);
+    }
+  }
+
+  // 요약을 각 활동에 추가
+  const addSummary = (items: any[], type: string) => {
+    return items.map(item => ({
+      ...item,
+      aiSummary: activitySummaries.get(item.id) || undefined
+    }));
+  };
+
   res.json({
     timeRange: {
       from: kst24hAgo.toISOString(),
@@ -127,10 +153,10 @@ router.get('/recent-activities', async (req: Request, res: Response) => {
       total: calls.length + notes.length + meetings.length + emails.length
     },
     activities: {
-      calls,
-      notes,
-      meetings,
-      emails
+      calls: includeSummaries ? addSummary(calls, 'call') : calls,
+      notes: includeSummaries ? addSummary(notes, 'note') : notes,
+      meetings: includeSummaries ? addSummary(meetings, 'meeting') : meetings,
+      emails: includeSummaries ? addSummary(emails, 'email') : emails
     }
   });
 });

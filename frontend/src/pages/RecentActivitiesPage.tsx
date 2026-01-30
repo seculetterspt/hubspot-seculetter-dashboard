@@ -84,16 +84,25 @@ export default function RecentActivitiesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('all')
   const [aiSummary, setAiSummary] = useState<AISummaryData | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
+  const [summariesLoading, setSummariesLoading] = useState(false)
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = async (withSummaries = false) => {
+    if (withSummaries) {
+      setSummariesLoading(true)
+    } else {
+      setLoading(true)
+    }
     try {
-      const res = await api.get('/analytics/recent-activities')
+      const url = withSummaries
+        ? '/analytics/recent-activities?includeSummaries=true'
+        : '/analytics/recent-activities'
+      const res = await api.get(url)
       setData(res.data)
     } catch (error) {
       console.error('Error:', error)
     } finally {
       setLoading(false)
+      setSummariesLoading(false)
     }
   }
 
@@ -110,9 +119,13 @@ export default function RecentActivitiesPage() {
   }
 
   useEffect(() => {
-    fetchData()
+    fetchData(false)
     fetchAISummary()
   }, [])
+
+  const handleGenerateSummaries = () => {
+    fetchData(true)
+  }
 
   // UTC timestamp를 KST로 변환하여 표시 (HubSpot API는 UTC 반환)
   const formatToKST = (utcTimestamp: string | undefined) => {
@@ -207,13 +220,32 @@ export default function RecentActivitiesPage() {
             최근 24시간 (KST 기준) | 총 {data?.summary.total || 0}건
           </p>
         </div>
-        <button
-          onClick={() => { fetchData(); fetchAISummary(); }}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-        >
-          <RefreshCw size={18} />
-          새로고침
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleGenerateSummaries}
+            disabled={summariesLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+          >
+            {summariesLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                요약 생성 중...
+              </>
+            ) : (
+              <>
+                <Sparkles size={18} />
+                활동별 AI 요약
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => { fetchData(false); fetchAISummary(); }}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            <RefreshCw size={18} />
+            새로고침
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -419,6 +451,15 @@ export default function RecentActivitiesPage() {
                           {activity.type === 'meeting' && `${activity.outcome} | ${activity.location}`}
                           {activity.type === 'email' && activity.body?.substring(0, 100)}
                         </p>
+                        {activity.aiSummary && (
+                          <div className="mt-2 p-2 bg-purple-50 border border-purple-100 rounded-md">
+                            <div className="flex items-center gap-1 text-xs text-purple-600 mb-1">
+                              <Sparkles size={12} />
+                              <span className="font-medium">AI 요약</span>
+                            </div>
+                            <p className="text-sm text-purple-800">{activity.aiSummary}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
