@@ -132,9 +132,22 @@ router.get('/today-modified', async (req: Request, res: Response) => {
         notes: { count: todayNotes.length, items: todayNotes }
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching today modified data:', error);
-    res.status(500).json({ error: 'Failed to fetch today modified data' });
+    // Return empty data instead of error
+    res.json({
+      date: new Date().toISOString().split('T')[0],
+      error: error.message || 'Unknown error',
+      contacts: { count: 0, items: [] },
+      companies: { count: 0, items: [] },
+      deals: { count: 0, items: [] },
+      tickets: { count: 0, items: [] },
+      activities: {
+        meetings: { count: 0, items: [] },
+        calls: { count: 0, items: [] },
+        notes: { count: 0, items: [] }
+      }
+    });
   }
 });
 
