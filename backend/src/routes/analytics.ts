@@ -8,13 +8,9 @@ const router = Router();
 
 // 최근 24시간 활동 내역 (KST 기준)
 router.get('/recent-activities', async (req: Request, res: Response) => {
-  // KST = UTC + 9시간
   const now = new Date();
-  const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-  const kst24hAgo = new Date(kstNow.getTime() - (24 * 60 * 60 * 1000));
 
-  // UTC 기준으로 변환 (HubSpot API는 UTC 사용)
-  const utcNow = now;
+  // 24시간 전 (UTC 기준 - HubSpot API는 UTC 사용)
   const utc24hAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 
   let calls: any[] = [];
@@ -22,82 +18,66 @@ router.get('/recent-activities', async (req: Request, res: Response) => {
   let meetings: any[] = [];
   let emails: any[] = [];
 
-  // 전화 (Calls)
+  // 전화 (Calls) - 최근 24시간 내 발생한 통화
   try {
     const callsRes = await hubspotClient.getCalls(100);
     calls = callsRes.results
       .filter(c => {
         const timestamp = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
-        return timestamp && timestamp >= utc24hAgo;
+        // 과거 24시간 내 통화만 (미래 제외)
+        return timestamp && timestamp >= utc24hAgo && timestamp <= now;
       })
-      .map(c => {
-        const timestamp = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
-        const kstTimestamp = timestamp ? new Date(timestamp.getTime() + (9 * 60 * 60 * 1000)) : null;
-        return {
-          id: c.id,
-          title: c.properties.hs_call_title || '(제목 없음)',
-          body: c.properties.hs_call_body || '-',
-          duration: c.properties.hs_call_duration ? Math.round(Number(c.properties.hs_call_duration) / 1000) : 0, // ms to seconds
-          status: c.properties.hs_call_status || '-',
-          direction: c.properties.hs_call_direction || '-',
-          disposition: c.properties.hs_call_disposition || '-',
-          timestamp: c.properties.hs_timestamp,
-          kstTimestamp: kstTimestamp?.toISOString()
-        };
-      })
+      .map(c => ({
+        id: c.id,
+        title: c.properties.hs_call_title || '(제목 없음)',
+        body: c.properties.hs_call_body || '-',
+        duration: c.properties.hs_call_duration ? Math.round(Number(c.properties.hs_call_duration) / 1000) : 0,
+        status: c.properties.hs_call_status || '-',
+        direction: c.properties.hs_call_direction || '-',
+        disposition: c.properties.hs_call_disposition || '-',
+        timestamp: c.properties.hs_timestamp
+      }))
       .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
   } catch (error) {
     console.error('Error fetching calls:', error);
   }
 
-  // 메모 (Notes)
+  // 메모 (Notes) - 최근 24시간 내 작성된 메모
   try {
     const notesRes = await hubspotClient.getNotes(100);
     notes = notesRes.results
       .filter(n => {
         const timestamp = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
-        return timestamp && timestamp >= utc24hAgo;
+        return timestamp && timestamp >= utc24hAgo && timestamp <= now;
       })
-      .map(n => {
-        const timestamp = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
-        const kstTimestamp = timestamp ? new Date(timestamp.getTime() + (9 * 60 * 60 * 1000)) : null;
-        return {
-          id: n.id,
-          body: n.properties.hs_note_body || '(내용 없음)',
-          timestamp: n.properties.hs_timestamp,
-          kstTimestamp: kstTimestamp?.toISOString()
-        };
-      })
+      .map(n => ({
+        id: n.id,
+        body: n.properties.hs_note_body || '(내용 없음)',
+        timestamp: n.properties.hs_timestamp
+      }))
       .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
   } catch (error) {
     console.error('Error fetching notes:', error);
   }
 
-  // 미팅 (Meetings)
+  // 미팅 (Meetings) - 최근 24시간 내 시작된 미팅 (과거만, 미래 예정 제외)
   try {
     const meetingsRes = await hubspotClient.getMeetings(100);
     meetings = meetingsRes.results
       .filter(m => {
         const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
-        return startTime && startTime >= utc24hAgo;
+        // 과거 24시간 내 시작된 미팅만 (미래 예정 일정 제외)
+        return startTime && startTime >= utc24hAgo && startTime <= now;
       })
-      .map(m => {
-        const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
-        const endTime = m.properties.hs_meeting_end_time ? new Date(m.properties.hs_meeting_end_time) : null;
-        const kstStartTime = startTime ? new Date(startTime.getTime() + (9 * 60 * 60 * 1000)) : null;
-        const kstEndTime = endTime ? new Date(endTime.getTime() + (9 * 60 * 60 * 1000)) : null;
-        return {
-          id: m.id,
-          title: m.properties.hs_meeting_title || '(제목 없음)',
-          body: m.properties.hs_meeting_body || '-',
-          startTime: m.properties.hs_meeting_start_time,
-          endTime: m.properties.hs_meeting_end_time,
-          kstStartTime: kstStartTime?.toISOString(),
-          kstEndTime: kstEndTime?.toISOString(),
-          outcome: m.properties.hs_meeting_outcome || '-',
-          location: m.properties.hs_meeting_location || '-'
-        };
-      })
+      .map(m => ({
+        id: m.id,
+        title: m.properties.hs_meeting_title || '(제목 없음)',
+        body: m.properties.hs_meeting_body || '-',
+        startTime: m.properties.hs_meeting_start_time,
+        endTime: m.properties.hs_meeting_end_time,
+        outcome: m.properties.hs_meeting_outcome || '-',
+        location: m.properties.hs_meeting_location || '-'
+      }))
       .sort((a, b) => new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime());
   } catch (error) {
     console.error('Error fetching meetings:', error);
@@ -114,25 +94,24 @@ router.get('/recent-activities', async (req: Request, res: Response) => {
     emails = emailsRes.results
       .filter(e => {
         const timestamp = e.properties.hs_timestamp ? new Date(e.properties.hs_timestamp) : null;
-        return timestamp && timestamp >= utc24hAgo;
+        return timestamp && timestamp >= utc24hAgo && timestamp <= now;
       })
-      .map(e => {
-        const timestamp = e.properties.hs_timestamp ? new Date(e.properties.hs_timestamp) : null;
-        const kstTimestamp = timestamp ? new Date(timestamp.getTime() + (9 * 60 * 60 * 1000)) : null;
-        return {
-          id: e.id,
-          subject: e.properties.hs_email_subject || '(제목 없음)',
-          body: (e.properties.hs_email_text || '').substring(0, 200),
-          direction: e.properties.hs_email_direction || '-',
-          status: e.properties.hs_email_status || '-',
-          timestamp: e.properties.hs_timestamp,
-          kstTimestamp: kstTimestamp?.toISOString()
-        };
-      })
+      .map(e => ({
+        id: e.id,
+        subject: e.properties.hs_email_subject || '(제목 없음)',
+        body: (e.properties.hs_email_text || '').substring(0, 200),
+        direction: e.properties.hs_email_direction || '-',
+        status: e.properties.hs_email_status || '-',
+        timestamp: e.properties.hs_timestamp
+      }))
       .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
   } catch (error) {
     console.error('Error fetching emails (scope may be missing):', error);
   }
+
+  // 시간 범위 정보 (KST로 변환해서 표시)
+  const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  const kst24hAgo = new Date(utc24hAgo.getTime() + (9 * 60 * 60 * 1000));
 
   res.json({
     timeRange: {
@@ -159,11 +138,10 @@ router.get('/recent-activities', async (req: Request, res: Response) => {
 // 활동 요약 (OpenAI LLM)
 router.get('/activity-summary', async (req: Request, res: Response) => {
   try {
-    // KST = UTC + 9시간
     const now = new Date();
     const utc24hAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 
-    // 활동 데이터 수집
+    // 활동 데이터 수집 (과거 24시간 내 활동만)
     const activities: Array<{
       id: string;
       type: 'call' | 'note' | 'meeting' | 'email';
@@ -172,13 +150,13 @@ router.get('/activity-summary', async (req: Request, res: Response) => {
       timestamp: string;
     }> = [];
 
-    // 전화
+    // 전화 (과거 24시간 내)
     try {
       const callsRes = await hubspotClient.getCalls(50);
       callsRes.results
         .filter(c => {
           const timestamp = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
-          return timestamp && timestamp >= utc24hAgo;
+          return timestamp && timestamp >= utc24hAgo && timestamp <= now;
         })
         .forEach(c => {
           activities.push({
@@ -193,13 +171,13 @@ router.get('/activity-summary', async (req: Request, res: Response) => {
       console.error('Error fetching calls for summary:', error);
     }
 
-    // 메모
+    // 메모 (과거 24시간 내)
     try {
       const notesRes = await hubspotClient.getNotes(50);
       notesRes.results
         .filter(n => {
           const timestamp = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
-          return timestamp && timestamp >= utc24hAgo;
+          return timestamp && timestamp >= utc24hAgo && timestamp <= now;
         })
         .forEach(n => {
           activities.push({
@@ -213,13 +191,13 @@ router.get('/activity-summary', async (req: Request, res: Response) => {
       console.error('Error fetching notes for summary:', error);
     }
 
-    // 미팅
+    // 미팅 (과거 24시간 내 시작된 미팅만, 미래 예정 제외)
     try {
       const meetingsRes = await hubspotClient.getMeetings(50);
       meetingsRes.results
         .filter(m => {
           const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
-          return startTime && startTime >= utc24hAgo;
+          return startTime && startTime >= utc24hAgo && startTime <= now;
         })
         .forEach(m => {
           activities.push({
@@ -234,7 +212,7 @@ router.get('/activity-summary', async (req: Request, res: Response) => {
       console.error('Error fetching meetings for summary:', error);
     }
 
-    // 이메일
+    // 이메일 (과거 24시간 내)
     try {
       const emailsRes = await hubspotClient.api.crm.objects.basicApi.getPage(
         'emails',
@@ -245,7 +223,7 @@ router.get('/activity-summary', async (req: Request, res: Response) => {
       emailsRes.results
         .filter(e => {
           const timestamp = e.properties.hs_timestamp ? new Date(e.properties.hs_timestamp) : null;
-          return timestamp && timestamp >= utc24hAgo;
+          return timestamp && timestamp >= utc24hAgo && timestamp <= now;
         })
         .forEach(e => {
           activities.push({

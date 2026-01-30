@@ -11,14 +11,14 @@ interface Call {
   direction: string
   disposition: string
   timestamp: string
-  kstTimestamp: string
+  aiSummary?: string
 }
 
 interface Note {
   id: string
   body: string
   timestamp: string
-  kstTimestamp: string
+  aiSummary?: string
 }
 
 interface Meeting {
@@ -27,10 +27,9 @@ interface Meeting {
   body: string
   startTime: string
   endTime: string
-  kstStartTime: string
-  kstEndTime: string
   outcome: string
   location: string
+  aiSummary?: string
 }
 
 interface Email {
@@ -40,7 +39,7 @@ interface Email {
   direction: string
   status: string
   timestamp: string
-  kstTimestamp: string
+  aiSummary?: string
 }
 
 interface ActivitiesData {
@@ -115,16 +114,19 @@ export default function RecentActivitiesPage() {
     fetchAISummary()
   }, [])
 
-  const formatKstTime = (kstTimestamp: string | undefined) => {
-    if (!kstTimestamp) return '-'
-    const date = new Date(kstTimestamp)
-    return date.toLocaleString('ko-KR', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    })
+  // UTC timestamp를 KST로 변환하여 표시 (HubSpot API는 UTC 반환)
+  const formatToKST = (utcTimestamp: string | undefined) => {
+    if (!utcTimestamp) return '-'
+    const date = new Date(utcTimestamp)
+    // KST = UTC + 9시간
+    const kstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000))
+
+    const month = String(kstDate.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(kstDate.getUTCDate()).padStart(2, '0')
+    const hour = String(kstDate.getUTCHours()).padStart(2, '0')
+    const minute = String(kstDate.getUTCMinutes()).padStart(2, '0')
+
+    return `${month}.${day} ${hour}:${minute}`
   }
 
   const formatDuration = (seconds: number) => {
@@ -155,15 +157,15 @@ export default function RecentActivitiesPage() {
     if (!data) return []
 
     const all = [
-      ...data.activities.calls.map(c => ({ ...c, type: 'call' as const })),
-      ...data.activities.notes.map(n => ({ ...n, type: 'note' as const })),
-      ...data.activities.meetings.map(m => ({ ...m, type: 'meeting' as const, kstTimestamp: m.kstStartTime })),
-      ...data.activities.emails.map(e => ({ ...e, type: 'email' as const })),
+      ...data.activities.calls.map(c => ({ ...c, type: 'call' as const, sortTime: c.timestamp })),
+      ...data.activities.notes.map(n => ({ ...n, type: 'note' as const, sortTime: n.timestamp })),
+      ...data.activities.meetings.map(m => ({ ...m, type: 'meeting' as const, sortTime: m.startTime })),
+      ...data.activities.emails.map(e => ({ ...e, type: 'email' as const, sortTime: e.timestamp })),
     ]
 
     return all.sort((a, b) => {
-      const timeA = a.kstTimestamp ? new Date(a.kstTimestamp).getTime() : 0
-      const timeB = b.kstTimestamp ? new Date(b.kstTimestamp).getTime() : 0
+      const timeA = a.sortTime ? new Date(a.sortTime).getTime() : 0
+      const timeB = b.sortTime ? new Date(b.sortTime).getTime() : 0
       return timeB - timeA
     })
   }
@@ -188,6 +190,13 @@ export default function RecentActivitiesPage() {
     }
   }
 
+  const getActivityTime = (activity: any) => {
+    if (activity.type === 'meeting') {
+      return formatToKST(activity.startTime)
+    }
+    return formatToKST(activity.timestamp || activity.sortTime)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -195,11 +204,11 @@ export default function RecentActivitiesPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">최근 활동 내역</h1>
           <p className="text-gray-500 mt-1">
-            최근 24시간 ({data?.timeRange.timezone}) | 총 {data?.summary.total || 0}건
+            최근 24시간 (KST 기준) | 총 {data?.summary.total || 0}건
           </p>
         </div>
         <button
-          onClick={fetchData}
+          onClick={() => { fetchData(); fetchAISummary(); }}
           className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
         >
           <RefreshCw size={18} />
@@ -401,7 +410,7 @@ export default function RecentActivitiesPage() {
                             {activity.type === 'email' && activity.subject}
                           </span>
                           <span className="text-xs text-gray-500 whitespace-nowrap">
-                            {formatKstTime(activity.kstTimestamp)}
+                            {getActivityTime(activity)}
                           </span>
                         </div>
                         <p className="text-sm text-gray-600 mt-1 line-clamp-2">
@@ -427,7 +436,7 @@ export default function RecentActivitiesPage() {
                   <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">통화시간</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">상태</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">방향</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">일시(KST)</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">일시</th>
                 </tr>
               </thead>
               <tbody>
@@ -439,7 +448,7 @@ export default function RecentActivitiesPage() {
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">{call.status}</span>
                     </td>
                     <td className="py-3 px-4 text-gray-600">{call.direction === 'INBOUND' ? '수신' : call.direction === 'OUTBOUND' ? '발신' : call.direction}</td>
-                    <td className="py-3 px-4 text-gray-500 text-sm">{formatKstTime(call.kstTimestamp)}</td>
+                    <td className="py-3 px-4 text-gray-500 text-sm">{formatToKST(call.timestamp)}</td>
                   </tr>
                 ))}
                 {data?.activities.calls.length === 0 && (
@@ -455,7 +464,7 @@ export default function RecentActivitiesPage() {
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">내용</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 w-40">작성일시(KST)</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 w-40">작성일시</th>
                 </tr>
               </thead>
               <tbody>
@@ -464,7 +473,7 @@ export default function RecentActivitiesPage() {
                     <td className="py-3 px-4 text-gray-900">
                       <div dangerouslySetInnerHTML={{ __html: note.body.substring(0, 300) }} className="prose prose-sm max-w-none" />
                     </td>
-                    <td className="py-3 px-4 text-gray-500 text-sm">{formatKstTime(note.kstTimestamp)}</td>
+                    <td className="py-3 px-4 text-gray-500 text-sm">{formatToKST(note.timestamp)}</td>
                   </tr>
                 ))}
                 {data?.activities.notes.length === 0 && (
@@ -480,7 +489,7 @@ export default function RecentActivitiesPage() {
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">제목</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">시간(KST)</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">시간</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">장소</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">결과</th>
                 </tr>
@@ -490,7 +499,7 @@ export default function RecentActivitiesPage() {
                   <tr key={meeting.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4 font-medium text-gray-900">{meeting.title}</td>
                     <td className="py-3 px-4 text-gray-600 text-sm">
-                      {formatKstTime(meeting.kstStartTime)} ~ {formatKstTime(meeting.kstEndTime)}
+                      {formatToKST(meeting.startTime)} ~ {formatToKST(meeting.endTime)}
                     </td>
                     <td className="py-3 px-4 text-gray-600">{meeting.location}</td>
                     <td className="py-3 px-4">
@@ -513,7 +522,7 @@ export default function RecentActivitiesPage() {
                   <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">제목</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">방향</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">상태</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">일시(KST)</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">일시</th>
                 </tr>
               </thead>
               <tbody>
@@ -524,7 +533,7 @@ export default function RecentActivitiesPage() {
                     <td className="py-3 px-4">
                       <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">{email.status}</span>
                     </td>
-                    <td className="py-3 px-4 text-gray-500 text-sm">{formatKstTime(email.kstTimestamp)}</td>
+                    <td className="py-3 px-4 text-gray-500 text-sm">{formatToKST(email.timestamp)}</td>
                   </tr>
                 ))}
                 {data?.activities.emails.length === 0 && (
