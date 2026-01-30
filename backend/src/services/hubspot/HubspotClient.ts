@@ -3,8 +3,6 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const HUBSPOT_ACCOUNT_ID = '243367573';
-
 export class HubspotClient {
   private client: Client;
 
@@ -34,29 +32,6 @@ export class HubspotClient {
     }
   }
 
-  async searchContactsCreatedToday() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    try {
-      const response = await this.client.crm.contacts.searchApi.doSearch({
-        filterGroups: [{
-          filters: [{
-            propertyName: 'createdate',
-            operator: 'GTE',
-            value: today.getTime().toString()
-          }]
-        }],
-        properties: ['firstname', 'lastname', 'email', 'company', 'lifecyclestage', 'hs_analytics_source', 'jobtitle'],
-        limit: 100
-      });
-      return response;
-    } catch (error) {
-      console.error('Error searching contacts:', error);
-      throw error;
-    }
-  }
-
   async getCompanies(limit = 100, after?: string) {
     try {
       const response = await this.client.crm.companies.basicApi.getPage(
@@ -81,33 +56,6 @@ export class HubspotClient {
       return response;
     } catch (error) {
       console.error('Error fetching deals:', error);
-      throw error;
-    }
-  }
-
-  async searchDealsCreatedInPeriod(startDate: Date, endDate: Date) {
-    try {
-      const response = await this.client.crm.deals.searchApi.doSearch({
-        filterGroups: [{
-          filters: [
-            {
-              propertyName: 'createdate',
-              operator: 'GTE',
-              value: startDate.getTime().toString()
-            },
-            {
-              propertyName: 'createdate',
-              operator: 'LTE',
-              value: endDate.getTime().toString()
-            }
-          ]
-        }],
-        properties: ['dealname', 'amount', 'dealstage', 'pipeline', 'closedate', 'hubspot_owner_id'],
-        limit: 100
-      });
-      return response;
-    } catch (error) {
-      console.error('Error searching deals:', error);
       throw error;
     }
   }

@@ -59,7 +59,7 @@ export class DailySnapshotService {
     try {
       // Contacts
       const contactsResponse = await hubspotClient.getContacts(100);
-      snapshot.contacts.total = contactsResponse.total || contactsResponse.results.length;
+      snapshot.contacts.total = contactsResponse.results.length;
 
       const today = new Date(date);
       today.setHours(0, 0, 0, 0);
@@ -99,7 +99,7 @@ export class DailySnapshotService {
 
       // Companies
       const companiesResponse = await hubspotClient.getCompanies(100);
-      snapshot.companies.total = companiesResponse.total || companiesResponse.results.length;
+      snapshot.companies.total = companiesResponse.results.length;
 
       for (const company of companiesResponse.results) {
         const props = company.properties;
