@@ -5,6 +5,156 @@ import { hubspotClient } from '../services/hubspot/HubspotClient.js';
 
 const router = Router();
 
+// 최근 24시간 활동 내역 (KST 기준)
+router.get('/recent-activities', async (req: Request, res: Response) => {
+  // KST = UTC + 9시간
+  const now = new Date();
+  const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  const kst24hAgo = new Date(kstNow.getTime() - (24 * 60 * 60 * 1000));
+
+  // UTC 기준으로 변환 (HubSpot API는 UTC 사용)
+  const utcNow = now;
+  const utc24hAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+  let calls: any[] = [];
+  let notes: any[] = [];
+  let meetings: any[] = [];
+  let emails: any[] = [];
+
+  // 전화 (Calls)
+  try {
+    const callsRes = await hubspotClient.getCalls(100);
+    calls = callsRes.results
+      .filter(c => {
+        const timestamp = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
+        return timestamp && timestamp >= utc24hAgo;
+      })
+      .map(c => {
+        const timestamp = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
+        const kstTimestamp = timestamp ? new Date(timestamp.getTime() + (9 * 60 * 60 * 1000)) : null;
+        return {
+          id: c.id,
+          title: c.properties.hs_call_title || '(제목 없음)',
+          body: c.properties.hs_call_body || '-',
+          duration: c.properties.hs_call_duration ? Math.round(Number(c.properties.hs_call_duration) / 1000) : 0, // ms to seconds
+          status: c.properties.hs_call_status || '-',
+          direction: c.properties.hs_call_direction || '-',
+          disposition: c.properties.hs_call_disposition || '-',
+          timestamp: c.properties.hs_timestamp,
+          kstTimestamp: kstTimestamp?.toISOString()
+        };
+      })
+      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+  } catch (error) {
+    console.error('Error fetching calls:', error);
+  }
+
+  // 메모 (Notes)
+  try {
+    const notesRes = await hubspotClient.getNotes(100);
+    notes = notesRes.results
+      .filter(n => {
+        const timestamp = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
+        return timestamp && timestamp >= utc24hAgo;
+      })
+      .map(n => {
+        const timestamp = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
+        const kstTimestamp = timestamp ? new Date(timestamp.getTime() + (9 * 60 * 60 * 1000)) : null;
+        return {
+          id: n.id,
+          body: n.properties.hs_note_body || '(내용 없음)',
+          timestamp: n.properties.hs_timestamp,
+          kstTimestamp: kstTimestamp?.toISOString()
+        };
+      })
+      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+  } catch (error) {
+    console.error('Error fetching notes:', error);
+  }
+
+  // 미팅 (Meetings)
+  try {
+    const meetingsRes = await hubspotClient.getMeetings(100);
+    meetings = meetingsRes.results
+      .filter(m => {
+        const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
+        return startTime && startTime >= utc24hAgo;
+      })
+      .map(m => {
+        const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
+        const endTime = m.properties.hs_meeting_end_time ? new Date(m.properties.hs_meeting_end_time) : null;
+        const kstStartTime = startTime ? new Date(startTime.getTime() + (9 * 60 * 60 * 1000)) : null;
+        const kstEndTime = endTime ? new Date(endTime.getTime() + (9 * 60 * 60 * 1000)) : null;
+        return {
+          id: m.id,
+          title: m.properties.hs_meeting_title || '(제목 없음)',
+          body: m.properties.hs_meeting_body || '-',
+          startTime: m.properties.hs_meeting_start_time,
+          endTime: m.properties.hs_meeting_end_time,
+          kstStartTime: kstStartTime?.toISOString(),
+          kstEndTime: kstEndTime?.toISOString(),
+          outcome: m.properties.hs_meeting_outcome || '-',
+          location: m.properties.hs_meeting_location || '-'
+        };
+      })
+      .sort((a, b) => new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime());
+  } catch (error) {
+    console.error('Error fetching meetings:', error);
+  }
+
+  // 이메일 (Emails) - 권한 있을 경우만
+  try {
+    const emailsRes = await hubspotClient.api.crm.objects.basicApi.getPage(
+      'emails',
+      100,
+      undefined,
+      ['hs_email_subject', 'hs_email_text', 'hs_email_direction', 'hs_email_status', 'hs_timestamp']
+    );
+    emails = emailsRes.results
+      .filter(e => {
+        const timestamp = e.properties.hs_timestamp ? new Date(e.properties.hs_timestamp) : null;
+        return timestamp && timestamp >= utc24hAgo;
+      })
+      .map(e => {
+        const timestamp = e.properties.hs_timestamp ? new Date(e.properties.hs_timestamp) : null;
+        const kstTimestamp = timestamp ? new Date(timestamp.getTime() + (9 * 60 * 60 * 1000)) : null;
+        return {
+          id: e.id,
+          subject: e.properties.hs_email_subject || '(제목 없음)',
+          body: (e.properties.hs_email_text || '').substring(0, 200),
+          direction: e.properties.hs_email_direction || '-',
+          status: e.properties.hs_email_status || '-',
+          timestamp: e.properties.hs_timestamp,
+          kstTimestamp: kstTimestamp?.toISOString()
+        };
+      })
+      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+  } catch (error) {
+    console.error('Error fetching emails (scope may be missing):', error);
+  }
+
+  res.json({
+    timeRange: {
+      from: kst24hAgo.toISOString(),
+      to: kstNow.toISOString(),
+      timezone: 'KST (UTC+9)'
+    },
+    summary: {
+      calls: calls.length,
+      notes: notes.length,
+      meetings: meetings.length,
+      emails: emails.length,
+      total: calls.length + notes.length + meetings.length + emails.length
+    },
+    activities: {
+      calls,
+      notes,
+      meetings,
+      emails
+    }
+  });
+});
+
 // 오늘 수정된 데이터 (오브젝트별 테이블)
 router.get('/today-modified', async (req: Request, res: Response) => {
   const today = new Date();
