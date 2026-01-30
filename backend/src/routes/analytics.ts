@@ -8,6 +8,9 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Rate Limit 방지용 딜레이 함수
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 const router = Router();
 
 // 딜 요약 (파이프라인별 스테이지 정리)
@@ -200,6 +203,8 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
       }
     } catch (e) { /* ignore */ }
 
+    await delay(500); // Rate Limit 방지
+
     // 메모 조회
     try {
       const notesRes = await hubspotClient.getNotes(100);
@@ -220,6 +225,8 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
       }
     } catch (e) { /* ignore */ }
 
+    await delay(500); // Rate Limit 방지
+
     // 미팅 조회
     try {
       const meetingsRes = await hubspotClient.getMeetings(100);
@@ -239,6 +246,8 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
         });
       }
     } catch (e) { /* ignore */ }
+
+    await delay(500); // Rate Limit 방지
 
     // 이메일 조회
     try {
@@ -263,11 +272,13 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
       }
     } catch (e) { /* ignore */ }
 
-    // 활동별 Association 조회 (딜, 회사)
-    const batchSize = 10;
+    await delay(500); // Rate Limit 방지
+
+    // 활동별 Association 조회 (딜, 회사) - Rate Limit 방지를 위해 순차 처리
+    const batchSize = 5; // 배치 크기 줄임
     for (let i = 0; i < activities.length; i += batchSize) {
       const batch = activities.slice(i, i + batchSize);
-      const promises = batch.map(async (activity) => {
+      for (const activity of batch) {
         const objectType = activity.type === 'call' ? 'calls' :
                           activity.type === 'note' ? 'notes' :
                           activity.type === 'meeting' ? 'meetings' : 'emails';
@@ -281,8 +292,9 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
             activity.companyName = assoc.companies[0].name;
           }
         } catch (e) { /* ignore */ }
-      });
-      await Promise.all(promises);
+        await delay(200); // 각 요청 사이 딜레이
+      }
+      await delay(1000); // 배치 사이 딜레이
     }
 
     // 딜이 연결된 활동만 필터링
