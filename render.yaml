@@ -19,10 +19,7 @@ services:
           name: seculetter-hubspot-db
           property: connectionString
       - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: seculetter-hubspot-dashboard
-          property: host
+        value: https://seculetter-hubspot-dashboard.onrender.com
     autoDeploy: true
 
   # Frontend Dashboard

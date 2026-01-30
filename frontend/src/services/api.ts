@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const baseURL = import.meta.env.PROD
-  ? '/api'
+  ? 'https://seculetter-hubspot-api.onrender.com/api'
   : 'http://localhost:3001/api'
 
 export const api = axios.create({
