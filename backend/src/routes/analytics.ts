@@ -178,6 +178,7 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
       date: string;
       dealId?: string;
       dealName?: string;
+      companyId?: string;
       companyName?: string;
     }
 
@@ -289,6 +290,7 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
             activity.dealName = assoc.deals[0].name;
           }
           if (assoc.companies && assoc.companies.length > 0) {
+            activity.companyId = assoc.companies[0].id;
             activity.companyName = assoc.companies[0].name;
           }
         } catch (e) { /* ignore */ }
@@ -297,21 +299,24 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
       await delay(1000); // 배치 사이 딜레이
     }
 
-    // 딜이 연결된 활동만 필터링
-    const dealActivities = activities.filter(a => a.dealId);
-
     // 파이프라인 및 딜 정보 조회
     const pipelines = await hubspotClient.getDealPipelines();
+    await delay(500);
+
     let allDeals: any[] = [];
     let after: string | undefined = undefined;
     do {
       const dealsRes = await hubspotClient.getDeals(100, after);
       allDeals = allDeals.concat(dealsRes.results);
       after = dealsRes.paging?.next?.after;
+      if (after) await delay(500);
     } while (after);
 
     // 딜 ID -> 딜 정보 매핑
     const dealMap = new Map<string, any>();
+    // 회사 ID -> 딜 ID 매핑 (회사를 통한 간접 매칭용)
+    const companyToDealMap = new Map<string, string>();
+
     allDeals.forEach(deal => {
       const closeDate = deal.properties.closedate ? new Date(deal.properties.closedate) : null;
       // 연도 필터링
@@ -330,6 +335,30 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
       });
     });
 
+    // 딜의 회사 Association 조회 (회사를 통한 간접 매칭)
+    const dealIds = Array.from(dealMap.keys());
+    for (let i = 0; i < dealIds.length; i += 5) {
+      const batch = dealIds.slice(i, i + 5);
+      for (const dealId of batch) {
+        try {
+          const assocRes = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
+            'deals', dealId, 'companies'
+          );
+          if (assocRes.results && assocRes.results.length > 0) {
+            const companyId = assocRes.results[0].toObjectId;
+            companyToDealMap.set(companyId, dealId);
+            // 회사 이름도 저장
+            const deal = dealMap.get(dealId);
+            if (deal && !deal.companyId) {
+              deal.companyId = companyId;
+            }
+          }
+        } catch (e) { /* ignore */ }
+        await delay(200);
+      }
+      await delay(500);
+    }
+
     // 스테이지 정보 매핑
     const stageMap = new Map<string, string>();
     pipelines.results.forEach((p: any) => {
@@ -337,6 +366,23 @@ router.get('/deal-recent-activities', async (req: Request, res: Response) => {
         stageMap.set(s.id, s.label);
       });
     });
+
+    // 회사 ID를 통해 딜 간접 매칭 (딜에 직접 연결되지 않은 활동)
+    activities.forEach(activity => {
+      if (!activity.dealId && activity.companyId) {
+        const matchedDealId = companyToDealMap.get(activity.companyId);
+        if (matchedDealId) {
+          activity.dealId = matchedDealId;
+          const deal = dealMap.get(matchedDealId);
+          if (deal) {
+            activity.dealName = deal.name;
+          }
+        }
+      }
+    });
+
+    // 딜이 연결된 활동만 필터링
+    const dealActivities = activities.filter(a => a.dealId);
 
     // 딜별로 활동 그룹화
     const dealActivityMap = new Map<string, {
