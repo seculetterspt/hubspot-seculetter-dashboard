@@ -155,371 +155,11 @@ router.get('/deal-summary', async (req: Request, res: Response) => {
   }
 });
 
-// 딜별 최근 활동 조회 (AI 요약 포함)
-router.get('/deal-recent-activities', async (req: Request, res: Response) => {
-  try {
-    const { days = '14', pipelineId, year } = req.query;
-    const daysNum = parseInt(days as string) || 14;
-    const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
-
-    // 날짜 범위 설정
-    const now = new Date();
-    const fromDate = new Date(now.getTime() - (daysNum * 24 * 60 * 60 * 1000));
-    fromDate.setHours(0, 0, 0, 0);
-    now.setHours(23, 59, 59, 999);
-
-    // 모든 활동 조회
-    interface ActivityItem {
-      id: string;
-      type: 'call' | 'note' | 'meeting' | 'email';
-      title: string;
-      body: string;
-      timestamp: string;
-      date: string;
-      dealId?: string;
-      dealName?: string;
-      companyId?: string;
-      companyName?: string;
-    }
-
-    const activities: ActivityItem[] = [];
-
-    // 전화 조회
-    try {
-      const callsRes = await hubspotClient.getCalls(100);
-      const filtered = callsRes.results.filter((c: any) => {
-        const timestamp = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
-        return timestamp && timestamp >= fromDate && timestamp <= now;
-      });
-      for (const call of filtered) {
-        const timestamp = call.properties.hs_timestamp || '';
-        activities.push({
-          id: call.id,
-          type: 'call',
-          title: call.properties.hs_call_title || '(제목 없음)',
-          body: call.properties.hs_call_body || '',
-          timestamp,
-          date: timestamp ? new Date(timestamp).toISOString().split('T')[0] : ''
-        });
-      }
-    } catch (e) { /* ignore */ }
-
-    await delay(500); // Rate Limit 방지
-
-    // 메모 조회
-    try {
-      const notesRes = await hubspotClient.getNotes(100);
-      const filtered = notesRes.results.filter((n: any) => {
-        const timestamp = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
-        return timestamp && timestamp >= fromDate && timestamp <= now;
-      });
-      for (const note of filtered) {
-        const timestamp = note.properties.hs_timestamp || '';
-        activities.push({
-          id: note.id,
-          type: 'note',
-          title: '메모',
-          body: note.properties.hs_note_body || '',
-          timestamp,
-          date: timestamp ? new Date(timestamp).toISOString().split('T')[0] : ''
-        });
-      }
-    } catch (e) { /* ignore */ }
-
-    await delay(500); // Rate Limit 방지
-
-    // 미팅 조회
-    try {
-      const meetingsRes = await hubspotClient.getMeetings(100);
-      const filtered = meetingsRes.results.filter((m: any) => {
-        const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
-        return startTime && startTime >= fromDate && startTime <= now;
-      });
-      for (const meeting of filtered) {
-        const timestamp = meeting.properties.hs_meeting_start_time || '';
-        activities.push({
-          id: meeting.id,
-          type: 'meeting',
-          title: meeting.properties.hs_meeting_title || '(제목 없음)',
-          body: meeting.properties.hs_meeting_body || '',
-          timestamp,
-          date: timestamp ? new Date(timestamp).toISOString().split('T')[0] : ''
-        });
-      }
-    } catch (e) { /* ignore */ }
-
-    await delay(500); // Rate Limit 방지
-
-    // 이메일 조회
-    try {
-      const emailsRes = await hubspotClient.api.crm.objects.basicApi.getPage(
-        'emails', 100, undefined,
-        ['hs_email_subject', 'hs_email_text', 'hs_timestamp']
-      );
-      const filtered = emailsRes.results.filter((e: any) => {
-        const timestamp = e.properties.hs_timestamp ? new Date(e.properties.hs_timestamp) : null;
-        return timestamp && timestamp >= fromDate && timestamp <= now;
-      });
-      for (const email of filtered) {
-        const timestamp = email.properties.hs_timestamp || '';
-        activities.push({
-          id: email.id,
-          type: 'email',
-          title: email.properties.hs_email_subject || '(제목 없음)',
-          body: email.properties.hs_email_text || '',
-          timestamp,
-          date: timestamp ? new Date(timestamp).toISOString().split('T')[0] : ''
-        });
-      }
-    } catch (e) { /* ignore */ }
-
-    await delay(500); // Rate Limit 방지
-
-    // 활동별 Association 조회 (딜, 회사) - Rate Limit 방지를 위해 순차 처리
-    console.log(`Fetching associations for ${activities.length} activities...`);
-    const batchSize = 3; // 배치 크기 더 줄임
-    for (let i = 0; i < activities.length; i += batchSize) {
-      const batch = activities.slice(i, i + batchSize);
-      for (const activity of batch) {
-        const objectType = activity.type === 'call' ? 'calls' :
-                          activity.type === 'note' ? 'notes' :
-                          activity.type === 'meeting' ? 'meetings' : 'emails';
-
-        // 재시도 로직 (최대 3회)
-        for (let retry = 0; retry < 3; retry++) {
-          try {
-            const assoc = await hubspotClient.getActivityAssociations(objectType, activity.id);
-            if (assoc.deals && assoc.deals.length > 0) {
-              activity.dealId = assoc.deals[0].id;
-              activity.dealName = assoc.deals[0].name;
-              console.log(`Activity ${activity.id} (${activity.type}) -> Deal: ${activity.dealName}`);
-            }
-            if (assoc.companies && assoc.companies.length > 0) {
-              activity.companyId = assoc.companies[0].id;
-              activity.companyName = assoc.companies[0].name;
-            }
-            break; // 성공하면 루프 종료
-          } catch (e: any) {
-            if (e.code === 429 && retry < 2) {
-              // Rate Limit 에러면 대기 후 재시도
-              console.log(`Rate limit hit for activity ${activity.id}, waiting...`);
-              await delay(2000 * (retry + 1));
-            } else {
-              console.log(`Failed to get associations for activity ${activity.id}: ${e.message || e}`);
-              break;
-            }
-          }
-        }
-        await delay(300); // 각 요청 사이 딜레이 증가
-      }
-      await delay(1500); // 배치 사이 딜레이 증가
-    }
-    console.log(`Activities with deals: ${activities.filter(a => a.dealId).length}`);
-
-    // 파이프라인 및 딜 정보 조회
-    const pipelines = await hubspotClient.getDealPipelines();
-    await delay(500);
-
-    let allDeals: any[] = [];
-    let after: string | undefined = undefined;
-    do {
-      const dealsRes = await hubspotClient.getDeals(100, after);
-      allDeals = allDeals.concat(dealsRes.results);
-      after = dealsRes.paging?.next?.after;
-      if (after) await delay(500);
-    } while (after);
-
-    // 딜 ID -> 딜 정보 매핑
-    const dealMap = new Map<string, any>();
-    // 회사 ID -> 딜 ID 매핑 (회사를 통한 간접 매칭용)
-    const companyToDealMap = new Map<string, string>();
-
-    allDeals.forEach(deal => {
-      const closeDate = deal.properties.closedate ? new Date(deal.properties.closedate) : null;
-      // 연도 필터링
-      if (closeDate && closeDate.getFullYear() !== targetYear) return;
-
-      // 파이프라인 필터링
-      if (pipelineId && deal.properties.pipeline !== pipelineId) return;
-
-      dealMap.set(deal.id, {
-        id: deal.id,
-        name: deal.properties.dealname || '(거래명 없음)',
-        amount: parseFloat(deal.properties.amount) || 0,
-        pipeline: deal.properties.pipeline,
-        stage: deal.properties.dealstage,
-        closeDate: deal.properties.closedate
-      });
-    });
-
-    // 딜의 회사 Association 조회 (회사를 통한 간접 매칭)
-    const dealIds = Array.from(dealMap.keys());
-    for (let i = 0; i < dealIds.length; i += 5) {
-      const batch = dealIds.slice(i, i + 5);
-      for (const dealId of batch) {
-        try {
-          const assocRes = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
-            'deals', dealId, 'companies'
-          );
-          if (assocRes.results && assocRes.results.length > 0) {
-            const companyId = assocRes.results[0].toObjectId;
-            companyToDealMap.set(companyId, dealId);
-            // 회사 이름도 저장
-            const deal = dealMap.get(dealId);
-            if (deal && !deal.companyId) {
-              deal.companyId = companyId;
-            }
-          }
-        } catch (e) { /* ignore */ }
-        await delay(200);
-      }
-      await delay(500);
-    }
-
-    // 스테이지 정보 매핑
-    const stageMap = new Map<string, string>();
-    pipelines.results.forEach((p: any) => {
-      p.stages.forEach((s: any) => {
-        stageMap.set(s.id, s.label);
-      });
-    });
-
-    // 회사 ID를 통해 딜 간접 매칭 (딜에 직접 연결되지 않은 활동)
-    activities.forEach(activity => {
-      if (!activity.dealId && activity.companyId) {
-        const matchedDealId = companyToDealMap.get(activity.companyId);
-        if (matchedDealId) {
-          activity.dealId = matchedDealId;
-          const deal = dealMap.get(matchedDealId);
-          if (deal) {
-            activity.dealName = deal.name;
-          }
-        }
-      }
-    });
-
-    // 딜이 연결된 활동만 필터링
-    const dealActivities = activities.filter(a => a.dealId);
-
-    // 딜별로 활동 그룹화
-    const dealActivityMap = new Map<string, {
-      deal: any;
-      activities: ActivityItem[];
-      companyName: string;
-    }>();
-
-    dealActivities.forEach(activity => {
-      if (!activity.dealId) return;
-      const deal = dealMap.get(activity.dealId);
-      if (!deal) return; // 필터링된 딜이 아니면 스킵
-
-      if (!dealActivityMap.has(activity.dealId)) {
-        dealActivityMap.set(activity.dealId, {
-          deal: {
-            ...deal,
-            stageName: stageMap.get(deal.stage) || deal.stage
-          },
-          activities: [],
-          companyName: activity.companyName || ''
-        });
-      }
-      const entry = dealActivityMap.get(activity.dealId)!;
-      entry.activities.push(activity);
-      if (!entry.companyName && activity.companyName) {
-        entry.companyName = activity.companyName;
-      }
-    });
-
-    // 최근 활동 순으로 정렬
-    const sortedDealActivities = Array.from(dealActivityMap.values())
-      .map(entry => {
-        // 활동을 최신순 정렬
-        entry.activities.sort((a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        return {
-          ...entry,
-          latestActivityDate: entry.activities[0]?.timestamp || ''
-        };
-      })
-      .sort((a, b) =>
-        new Date(b.latestActivityDate).getTime() - new Date(a.latestActivityDate).getTime()
-      );
-
-    // AI 요약 생성 (각 딜의 활동들을 요약)
-    const summaryPromises = sortedDealActivities.map(async (entry) => {
-      try {
-        // 활동 내용 합치기
-        const activityTexts = entry.activities.slice(0, 5).map(a => {
-          const typeLabel = a.type === 'call' ? '전화' :
-                           a.type === 'note' ? '메모' :
-                           a.type === 'meeting' ? '미팅' : '이메일';
-          return `[${typeLabel}] ${a.title}: ${a.body?.substring(0, 200) || ''}`;
-        }).join('\n');
-
-        const prompt = `다음은 "${entry.deal.name}" 거래와 관련된 최근 활동 내용입니다.
-회사: ${entry.companyName || '(정보 없음)'}
-거래 단계: ${entry.deal.stageName}
-
-활동 내용:
-${activityTexts}
-
-위 활동들을 바탕으로 주요 진행 상황과 변동 사항을 3문장 이내로 간결하게 요약해주세요. 한국어로 작성하세요.`;
-
-        const response = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 200,
-          temperature: 0.3
-        });
-
-        return {
-          dealId: entry.deal.id,
-          summary: response.choices[0]?.message?.content || ''
-        };
-      } catch (e) {
-        return { dealId: entry.deal.id, summary: '' };
-      }
-    });
-
-    const summaries = await Promise.all(summaryPromises);
-    const summaryMap = new Map(summaries.map(s => [s.dealId, s.summary]));
-
-    // 응답 데이터 구성
-    const result = sortedDealActivities.map(entry => ({
-      dealId: entry.deal.id,
-      dealName: entry.deal.name,
-      companyName: entry.companyName,
-      stageName: entry.deal.stageName,
-      amount: entry.deal.amount,
-      activityCount: entry.activities.length,
-      latestActivityDate: entry.latestActivityDate,
-      aiSummary: summaryMap.get(entry.deal.id) || '',
-      activities: entry.activities.slice(0, 3).map(a => ({
-        type: a.type,
-        title: a.title,
-        date: a.date
-      }))
-    }));
-
-    res.json({
-      dateRange: {
-        from: fromDate.toISOString().split('T')[0],
-        to: now.toISOString().split('T')[0]
-      },
-      totalDeals: result.length,
-      deals: result
-    });
-  } catch (error) {
-    console.error('Error fetching deal recent activities:', error);
-    res.status(500).json({ error: 'Failed to fetch deal recent activities' });
-  }
-});
-
 // 활동 타임라인 (날짜 범위 기반) - 회사 연결 정보 포함
+// groupByDeals=true 시 딜별로 그룹화된 활동도 함께 반환
 router.get('/activity-timeline', async (req: Request, res: Response) => {
   try {
-    const { from, to, generateSummaries } = req.query;
+    const { from, to, generateSummaries, groupByDeals, pipelineId, year } = req.query;
 
     // 기본값: 2주 전 ~ 2주 후
     const now = new Date();
@@ -746,7 +386,165 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
     // 날짜 목록 생성 (활동이 있는 날짜만)
     const dates = Object.keys(groupedByDate).sort((a, b) => a.localeCompare(b));
 
-    res.json({
+    // 딜별 그룹화 (groupByDeals=true인 경우)
+    let dealActivities: any[] = [];
+    if (groupByDeals === 'true') {
+      const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+
+      // 딜 정보 조회
+      let allDeals: any[] = [];
+      let after: string | undefined = undefined;
+      do {
+        const dealsRes = await hubspotClient.getDeals(100, after);
+        allDeals = allDeals.concat(dealsRes.results);
+        after = dealsRes.paging?.next?.after;
+        if (after) await delay(300);
+      } while (after);
+
+      // 파이프라인 정보 조회
+      const pipelines = await hubspotClient.getDealPipelines();
+      const stageMap = new Map<string, string>();
+      pipelines.results.forEach((p: any) => {
+        p.stages.forEach((s: any) => {
+          stageMap.set(s.id, s.label);
+        });
+      });
+
+      // 딜 필터링 (연도, 파이프라인)
+      const dealMap = new Map<string, any>();
+      allDeals.forEach(deal => {
+        const closeDate = deal.properties.closedate ? new Date(deal.properties.closedate) : null;
+        if (closeDate && closeDate.getFullYear() !== targetYear) return;
+        if (pipelineId && deal.properties.pipeline !== pipelineId) return;
+
+        dealMap.set(deal.id, {
+          id: deal.id,
+          name: deal.properties.dealname || '(거래명 없음)',
+          amount: parseFloat(deal.properties.amount) || 0,
+          pipeline: deal.properties.pipeline,
+          stage: deal.properties.dealstage,
+          stageName: stageMap.get(deal.properties.dealstage) || deal.properties.dealstage,
+          closeDate: deal.properties.closedate
+        });
+      });
+
+      // 딜에 연결된 활동 필터링 및 그룹화
+      const dealActivityMap = new Map<string, {
+        deal: any;
+        activities: ActivityItem[];
+        companyName: string;
+      }>();
+
+      activities.forEach(activity => {
+        if (activity.associations.deals.length > 0) {
+          const dealId = activity.associations.deals[0].id;
+          const deal = dealMap.get(dealId);
+          if (deal) {
+            if (!dealActivityMap.has(dealId)) {
+              dealActivityMap.set(dealId, {
+                deal,
+                activities: [],
+                companyName: activity.associations.companies[0]?.name || ''
+              });
+            }
+            const entry = dealActivityMap.get(dealId)!;
+            entry.activities.push(activity);
+            if (!entry.companyName && activity.associations.companies[0]?.name) {
+              entry.companyName = activity.associations.companies[0].name;
+            }
+          }
+        }
+      });
+
+      // 최근 활동 순으로 정렬
+      const sortedDealActivities = Array.from(dealActivityMap.values())
+        .map(entry => {
+          entry.activities.sort((a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+          return {
+            ...entry,
+            latestActivityDate: entry.activities[0]?.timestamp || ''
+          };
+        })
+        .sort((a, b) =>
+          new Date(b.latestActivityDate).getTime() - new Date(a.latestActivityDate).getTime()
+        );
+
+      // AI 요약 생성 (딜별)
+      if (generateSummaries === 'true' && sortedDealActivities.length > 0) {
+        const summaryPromises = sortedDealActivities.map(async (entry) => {
+          try {
+            const activityTexts = entry.activities.slice(0, 5).map(a => {
+              const typeLabel = a.type === 'call' ? '전화' :
+                               a.type === 'note' ? '메모' :
+                               a.type === 'meeting' ? '미팅' : '이메일';
+              return `[${typeLabel}] ${a.title}: ${a.body?.substring(0, 200) || ''}`;
+            }).join('\n');
+
+            const prompt = `다음은 "${entry.deal.name}" 거래와 관련된 최근 활동 내용입니다.
+회사: ${entry.companyName || '(정보 없음)'}
+거래 단계: ${entry.deal.stageName}
+
+활동 내용:
+${activityTexts}
+
+위 활동들을 바탕으로 주요 진행 상황과 변동 사항을 3문장 이내로 간결하게 요약해주세요. 한국어로 작성하세요.`;
+
+            const response = await openai.chat.completions.create({
+              model: 'gpt-4o-mini',
+              messages: [{ role: 'user', content: prompt }],
+              max_tokens: 200,
+              temperature: 0.3
+            });
+
+            return {
+              dealId: entry.deal.id,
+              summary: response.choices[0]?.message?.content || ''
+            };
+          } catch (e) {
+            return { dealId: entry.deal.id, summary: '' };
+          }
+        });
+
+        const summaries = await Promise.all(summaryPromises);
+        const summaryMap = new Map(summaries.map(s => [s.dealId, s.summary]));
+
+        dealActivities = sortedDealActivities.map(entry => ({
+          dealId: entry.deal.id,
+          dealName: entry.deal.name,
+          companyName: entry.companyName,
+          stageName: entry.deal.stageName,
+          amount: entry.deal.amount,
+          activityCount: entry.activities.length,
+          latestActivityDate: entry.latestActivityDate,
+          aiSummary: summaryMap.get(entry.deal.id) || '',
+          activities: entry.activities.slice(0, 3).map(a => ({
+            type: a.type,
+            title: a.title,
+            date: a.date
+          }))
+        }));
+      } else {
+        dealActivities = sortedDealActivities.map(entry => ({
+          dealId: entry.deal.id,
+          dealName: entry.deal.name,
+          companyName: entry.companyName,
+          stageName: entry.deal.stageName,
+          amount: entry.deal.amount,
+          activityCount: entry.activities.length,
+          latestActivityDate: entry.latestActivityDate,
+          aiSummary: '',
+          activities: entry.activities.slice(0, 3).map(a => ({
+            type: a.type,
+            title: a.title,
+            date: a.date
+          }))
+        }));
+      }
+    }
+
+    const responseData: any = {
       dateRange: {
         from: fromDate.toISOString().split('T')[0],
         to: toDate.toISOString().split('T')[0]
@@ -754,7 +552,17 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       totalCount: activities.length,
       dates,
       activitiesByDate: groupedByDate
-    });
+    };
+
+    // 딜별 그룹화 데이터 추가
+    if (groupByDeals === 'true') {
+      responseData.dealActivities = {
+        totalDeals: dealActivities.length,
+        deals: dealActivities
+      };
+    }
+
+    res.json(responseData);
   } catch (error) {
     console.error('Error fetching activity timeline:', error);
     res.status(500).json({ error: 'Failed to fetch activity timeline' });

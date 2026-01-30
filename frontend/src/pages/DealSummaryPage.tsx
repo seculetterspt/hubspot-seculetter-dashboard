@@ -147,8 +147,35 @@ export default function DealSummaryPage() {
   const fetchRecentActivities = async (pipelineId?: string) => {
     setActivitiesLoading(true)
     try {
-      const res = await analyticsApi.getDealRecentActivities(selectedYear, pipelineId, 14)
-      setRecentActivities(res.data)
+      // 2주 전/후 날짜 계산
+      const now = new Date()
+      const from = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000))
+      const to = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000))
+
+      const res = await analyticsApi.getActivityTimelineWithDeals({
+        from: from.toISOString().split('T')[0],
+        to: to.toISOString().split('T')[0],
+        year: selectedYear,
+        pipelineId: pipelineId,
+        includeAssociations: true,
+        groupByDeals: true,
+        generateSummaries: true
+      })
+
+      // dealActivities 필드에서 데이터 추출
+      if (res.data.dealActivities) {
+        setRecentActivities({
+          dateRange: res.data.dateRange,
+          totalDeals: res.data.dealActivities.totalDeals,
+          deals: res.data.dealActivities.deals
+        })
+      } else {
+        setRecentActivities({
+          dateRange: res.data.dateRange,
+          totalDeals: 0,
+          deals: []
+        })
+      }
     } catch (error) {
       console.error('Error fetching recent activities:', error)
     } finally {
