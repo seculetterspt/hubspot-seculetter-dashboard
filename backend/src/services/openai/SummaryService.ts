@@ -7,10 +7,22 @@ interface Activity {
   body?: string;
   timestamp: string;
   associations?: {
-    contacts?: string[];
-    companies?: string[];
-    deals?: string[];
+    contacts?: { id: string; name: string }[];
+    companies?: { id: string; name: string }[];
+    deals?: { id: string; name: string }[];
   };
+}
+
+interface ActivityWithContext {
+  id: string;
+  type: 'call' | 'note' | 'meeting' | 'email';
+  title?: string;
+  body?: string;
+  timestamp: string;
+  date: string; // YYYY-MM-DD 형식
+  companyName?: string;
+  contactName?: string;
+  dealName?: string;
 }
 
 interface ActivitySummary {
@@ -172,6 +184,92 @@ ${activitiesForPrompt}
       }
     } catch (error) {
       console.error('Error generating individual summaries:', error);
+    }
+
+    return summaries;
+  }
+
+  // 날짜별 활동 요약 생성 (회사명 + 활동유형 + 날짜 형식)
+  async summarizeActivitiesWithContext(activities: ActivityWithContext[]): Promise<Map<string, string>> {
+    const summaries = new Map<string, string>();
+
+    if (!activities || activities.length === 0) {
+      return summaries;
+    }
+
+    // 활동 목록을 프롬프트로 변환
+    const activitiesForPrompt = activities.map((a, i) => {
+      const lines = [
+        `[${i + 1}] ID: ${a.id}`,
+        `유형: ${this.getTypeLabel(a.type)}`,
+        `날짜: ${a.date}`,
+      ];
+      if (a.companyName) lines.push(`회사: ${a.companyName}`);
+      if (a.contactName) lines.push(`담당자: ${a.contactName}`);
+      if (a.dealName) lines.push(`거래: ${a.dealName}`);
+      if (a.title) lines.push(`제목: ${a.title}`);
+      if (a.body) lines.push(`내용: ${a.body.substring(0, 500)}`);
+      return lines.join('\n');
+    }).join('\n\n---\n\n');
+
+    const prompt = `당신은 B2B 영업 활동을 분석하는 전문가입니다.
+다음 CRM 활동들에 대해 각각 핵심 내용을 2-3문장으로 요약해주세요.
+
+## 요약 작성 가이드:
+1. 고객의 문의/요청 사항을 명확히 기술
+2. 논의된 주요 내용 요약
+3. 후속 조치가 필요한 사항 포함
+4. 비즈니스 맥락에서 중요한 정보 강조
+
+## 활동 목록:
+${activitiesForPrompt}
+
+## 응답 형식:
+각 활동 ID에 대해 JSON 형식으로 응답해주세요:
+{
+  "summaries": {
+    "활동ID1": "고객 요청사항과 논의 내용, 후속 조치 사항을 포함한 2-3문장 요약",
+    "활동ID2": "고객 요청사항과 논의 내용, 후속 조치 사항을 포함한 2-3문장 요약"
+  }
+}
+
+반드시 유효한 JSON 형식으로 작성하세요. 한국어로 자연스럽게 작성해주세요.`;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: '당신은 B2B 영업 활동을 분석하는 전문가입니다. 각 활동의 비즈니스 맥락을 이해하고 핵심 내용을 명확하게 요약합니다.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.5,
+        max_tokens: 3000,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No response content from OpenAI');
+      }
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in response');
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.summaries && typeof parsed.summaries === 'object') {
+        for (const [id, summary] of Object.entries(parsed.summaries)) {
+          summaries.set(id, summary as string);
+        }
+      }
+    } catch (error) {
+      console.error('Error generating contextual summaries:', error);
     }
 
     return summaries;

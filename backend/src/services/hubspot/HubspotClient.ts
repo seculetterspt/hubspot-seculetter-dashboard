@@ -80,7 +80,7 @@ export class HubspotClient {
         'meetings',
         limit,
         after,
-        ['hs_meeting_title', 'hs_meeting_start_time', 'hs_meeting_end_time', 'hs_meeting_outcome', 'hubspot_owner_id']
+        ['hs_meeting_title', 'hs_meeting_body', 'hs_meeting_start_time', 'hs_meeting_end_time', 'hs_meeting_outcome', 'hs_meeting_location', 'hubspot_owner_id', 'hs_timestamp']
       );
       return response;
     } catch (error) {
@@ -95,7 +95,7 @@ export class HubspotClient {
         'calls',
         limit,
         after,
-        ['hs_call_title', 'hs_call_duration', 'hs_call_status', 'hs_timestamp', 'hubspot_owner_id']
+        ['hs_call_title', 'hs_call_body', 'hs_call_duration', 'hs_call_status', 'hs_call_direction', 'hs_call_disposition', 'hs_timestamp', 'hubspot_owner_id']
       );
       return response;
     } catch (error) {
@@ -117,6 +117,90 @@ export class HubspotClient {
       console.error('Error fetching notes:', error);
       throw error;
     }
+  }
+
+  // 활동의 연결 정보 조회 (회사, 연락처, 거래)
+  async getActivityAssociations(objectType: string, activityId: string) {
+    const associations: { companies: any[]; contacts: any[]; deals: any[] } = {
+      companies: [],
+      contacts: [],
+      deals: []
+    };
+
+    try {
+      // 회사 연결
+      const companyAssoc = await this.client.crm.associations.v4.basicApi.getPage(
+        objectType,
+        activityId,
+        'companies',
+        undefined,
+        10
+      );
+      if (companyAssoc.results.length > 0) {
+        const companyIds = companyAssoc.results.map(r => r.toObjectId);
+        for (const companyId of companyIds) {
+          try {
+            const company = await this.client.crm.companies.basicApi.getById(companyId, ['name']);
+            associations.companies.push({ id: companyId, name: company.properties.name || '(회사명 없음)' });
+          } catch (e) {
+            // 회사 조회 실패 시 무시
+          }
+        }
+      }
+    } catch (e) {
+      // 연결 조회 실패 시 무시
+    }
+
+    try {
+      // 연락처 연결
+      const contactAssoc = await this.client.crm.associations.v4.basicApi.getPage(
+        objectType,
+        activityId,
+        'contacts',
+        undefined,
+        10
+      );
+      if (contactAssoc.results.length > 0) {
+        const contactIds = contactAssoc.results.map(r => r.toObjectId);
+        for (const contactId of contactIds) {
+          try {
+            const contact = await this.client.crm.contacts.basicApi.getById(contactId, ['firstname', 'lastname']);
+            const name = `${contact.properties.firstname || ''} ${contact.properties.lastname || ''}`.trim() || '(이름 없음)';
+            associations.contacts.push({ id: contactId, name });
+          } catch (e) {
+            // 연락처 조회 실패 시 무시
+          }
+        }
+      }
+    } catch (e) {
+      // 연결 조회 실패 시 무시
+    }
+
+    try {
+      // 거래 연결
+      const dealAssoc = await this.client.crm.associations.v4.basicApi.getPage(
+        objectType,
+        activityId,
+        'deals',
+        undefined,
+        10
+      );
+      if (dealAssoc.results.length > 0) {
+        const dealIds = dealAssoc.results.map(r => r.toObjectId);
+        for (const dealId of dealIds) {
+          try {
+            const deal = await this.client.crm.deals.basicApi.getById(dealId, ['dealname']);
+            associations.deals.push({ id: dealId, name: deal.properties.dealname || '(거래명 없음)' });
+          } catch (e) {
+            // 거래 조회 실패 시 무시
+          }
+        }
+      }
+    } catch (e) {
+      // 연결 조회 실패 시 무시
+    }
+
+    return associations;
   }
 
   async getOwners() {

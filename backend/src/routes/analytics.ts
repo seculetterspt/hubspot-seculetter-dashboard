@@ -286,6 +286,212 @@ router.get('/activity-summary', async (req: Request, res: Response) => {
   }
 });
 
+// 활동 타임라인 (날짜 범위 기반) - 회사 연결 정보 포함
+router.get('/activity-timeline', async (req: Request, res: Response) => {
+  try {
+    const { from, to, generateSummaries } = req.query;
+
+    // 기본값: 2주 전 ~ 2주 후
+    const now = new Date();
+    const defaultFrom = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000));
+    const defaultTo = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
+
+    const fromDate = from ? new Date(from as string) : defaultFrom;
+    const toDate = to ? new Date(to as string) : defaultTo;
+
+    // 날짜 범위 설정 (시작일 00:00:00, 종료일 23:59:59)
+    fromDate.setHours(0, 0, 0, 0);
+    toDate.setHours(23, 59, 59, 999);
+
+    interface ActivityItem {
+      id: string;
+      type: 'call' | 'note' | 'meeting' | 'email';
+      title: string;
+      body: string;
+      timestamp: string;
+      date: string;
+      associations: {
+        companies: { id: string; name: string }[];
+        contacts: { id: string; name: string }[];
+        deals: { id: string; name: string }[];
+      };
+      aiSummary?: string;
+    }
+
+    const activities: ActivityItem[] = [];
+
+    // 전화 조회
+    try {
+      const callsRes = await hubspotClient.getCalls(200);
+      const filteredCalls = callsRes.results.filter(c => {
+        const timestamp = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
+        return timestamp && timestamp >= fromDate && timestamp <= toDate;
+      });
+
+      for (const call of filteredCalls) {
+        const timestamp = call.properties.hs_timestamp || '';
+        const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
+        const associations = await hubspotClient.getActivityAssociations('calls', call.id);
+
+        activities.push({
+          id: call.id,
+          type: 'call',
+          title: call.properties.hs_call_title || '(제목 없음)',
+          body: call.properties.hs_call_body || '',
+          timestamp,
+          date,
+          associations
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching calls for timeline:', error);
+    }
+
+    // 메모 조회
+    try {
+      const notesRes = await hubspotClient.getNotes(200);
+      const filteredNotes = notesRes.results.filter(n => {
+        const timestamp = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
+        return timestamp && timestamp >= fromDate && timestamp <= toDate;
+      });
+
+      for (const note of filteredNotes) {
+        const timestamp = note.properties.hs_timestamp || '';
+        const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
+        const associations = await hubspotClient.getActivityAssociations('notes', note.id);
+
+        activities.push({
+          id: note.id,
+          type: 'note',
+          title: '메모',
+          body: note.properties.hs_note_body || '',
+          timestamp,
+          date,
+          associations
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching notes for timeline:', error);
+    }
+
+    // 미팅 조회 (예정된 미팅 포함)
+    try {
+      const meetingsRes = await hubspotClient.getMeetings(200);
+      const filteredMeetings = meetingsRes.results.filter(m => {
+        const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
+        return startTime && startTime >= fromDate && startTime <= toDate;
+      });
+
+      for (const meeting of filteredMeetings) {
+        const timestamp = meeting.properties.hs_meeting_start_time || '';
+        const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
+        const associations = await hubspotClient.getActivityAssociations('meetings', meeting.id);
+
+        activities.push({
+          id: meeting.id,
+          type: 'meeting',
+          title: meeting.properties.hs_meeting_title || '(제목 없음)',
+          body: meeting.properties.hs_meeting_body || '',
+          timestamp,
+          date,
+          associations
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching meetings for timeline:', error);
+    }
+
+    // 이메일 조회
+    try {
+      const emailsRes = await hubspotClient.api.crm.objects.basicApi.getPage(
+        'emails',
+        200,
+        undefined,
+        ['hs_email_subject', 'hs_email_text', 'hs_email_direction', 'hs_timestamp']
+      );
+      const filteredEmails = emailsRes.results.filter(e => {
+        const timestamp = e.properties.hs_timestamp ? new Date(e.properties.hs_timestamp) : null;
+        return timestamp && timestamp >= fromDate && timestamp <= toDate;
+      });
+
+      for (const email of filteredEmails) {
+        const timestamp = email.properties.hs_timestamp || '';
+        const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
+        const associations = await hubspotClient.getActivityAssociations('emails', email.id);
+
+        activities.push({
+          id: email.id,
+          type: 'email',
+          title: email.properties.hs_email_subject || '(제목 없음)',
+          body: email.properties.hs_email_text || '',
+          timestamp,
+          date,
+          associations
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching emails for timeline:', error);
+    }
+
+    // AI 요약 생성
+    if (generateSummaries === 'true' && activities.length > 0) {
+      try {
+        const activitiesForSummary = activities.map(a => ({
+          id: a.id,
+          type: a.type,
+          title: a.title,
+          body: a.body,
+          timestamp: a.timestamp,
+          date: a.date,
+          companyName: a.associations.companies[0]?.name,
+          contactName: a.associations.contacts[0]?.name,
+          dealName: a.associations.deals[0]?.name,
+        }));
+
+        const summaries = await summaryService.summarizeActivitiesWithContext(activitiesForSummary);
+
+        activities.forEach(a => {
+          a.aiSummary = summaries.get(a.id);
+        });
+      } catch (error) {
+        console.error('Error generating AI summaries:', error);
+      }
+    }
+
+    // 날짜별로 그룹화
+    const groupedByDate: Record<string, ActivityItem[]> = {};
+    activities.forEach(a => {
+      if (!groupedByDate[a.date]) {
+        groupedByDate[a.date] = [];
+      }
+      groupedByDate[a.date].push(a);
+    });
+
+    // 각 날짜 내에서 시간순 정렬
+    Object.keys(groupedByDate).forEach(date => {
+      groupedByDate[date].sort((a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+    });
+
+    // 날짜 목록 생성 (활동이 있는 날짜만)
+    const dates = Object.keys(groupedByDate).sort((a, b) => a.localeCompare(b));
+
+    res.json({
+      dateRange: {
+        from: fromDate.toISOString().split('T')[0],
+        to: toDate.toISOString().split('T')[0]
+      },
+      totalCount: activities.length,
+      dates,
+      activitiesByDate: groupedByDate
+    });
+  } catch (error) {
+    console.error('Error fetching activity timeline:', error);
+    res.status(500).json({ error: 'Failed to fetch activity timeline' });
+  }
+});
+
 // 오늘 수정된 데이터 (오브젝트별 테이블)
 router.get('/today-modified', async (req: Request, res: Response) => {
   const today = new Date();
