@@ -203,6 +203,49 @@ export class HubspotClient {
     return associations;
   }
 
+  // 활동에 연결된 노트(댓글) 조회
+  async getActivityNotes(objectType: string, activityId: string): Promise<{ id: string; body: string; timestamp: string }[]> {
+    const notes: { id: string; body: string; timestamp: string }[] = [];
+
+    try {
+      // 활동에 연결된 notes 조회
+      const noteAssoc = await this.client.crm.associations.v4.basicApi.getPage(
+        objectType,
+        activityId,
+        'notes',
+        undefined,
+        50
+      );
+
+      if (noteAssoc.results.length > 0) {
+        const noteIds = noteAssoc.results.map(r => r.toObjectId);
+        for (const noteId of noteIds) {
+          try {
+            const note = await this.client.crm.objects.basicApi.getById(
+              'notes',
+              noteId,
+              ['hs_note_body', 'hs_timestamp']
+            );
+            notes.push({
+              id: noteId,
+              body: note.properties.hs_note_body || '',
+              timestamp: note.properties.hs_timestamp || ''
+            });
+          } catch (e) {
+            // 노트 조회 실패 시 무시
+          }
+        }
+      }
+    } catch (e) {
+      // 연결 조회 실패 시 무시 (notes 연결이 없을 수 있음)
+    }
+
+    // 시간순 정렬 (최신순)
+    notes.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return notes;
+  }
+
   async getOwners() {
     try {
       const response = await this.client.crm.owners.ownersApi.getPage();

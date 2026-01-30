@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { RefreshCw, Phone, FileText, Calendar, Mail, Sparkles, Building2, User, Briefcase, ExternalLink } from 'lucide-react'
+import { RefreshCw, Phone, FileText, Calendar, Mail, Sparkles, Building2, User, Briefcase, ExternalLink, MessageSquare } from 'lucide-react'
 import { api } from '../services/api'
 
 // HubSpot Portal ID
@@ -15,6 +15,12 @@ interface Association {
   name: string
 }
 
+interface Comment {
+  id: string
+  body: string
+  timestamp: string
+}
+
 interface Activity {
   id: string
   type: 'call' | 'note' | 'meeting' | 'email'
@@ -27,6 +33,7 @@ interface Activity {
     contacts: Association[]
     deals: Association[]
   }
+  comments?: Comment[]
   aiSummary?: string
 }
 
@@ -367,6 +374,31 @@ export default function ActivityTimelinePage() {
                               }}
                               className="prose prose-sm max-w-none"
                             />
+                          </div>
+                        )}
+
+                        {/* 댓글/노트 표시 */}
+                        {activity.comments && activity.comments.length > 0 && (
+                          <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 mb-3">
+                            <div className="flex items-center gap-1 text-xs text-amber-700 mb-2">
+                              <MessageSquare size={12} />
+                              <span className="font-medium">댓글 ({activity.comments.length})</span>
+                            </div>
+                            <div className="space-y-2">
+                              {activity.comments.map((comment, idx) => (
+                                <div key={comment.id || idx} className="text-sm text-gray-700 pl-3 border-l-2 border-amber-300">
+                                  <div
+                                    dangerouslySetInnerHTML={{
+                                      __html: comment.body.substring(0, 300) + (comment.body.length > 300 ? '...' : '')
+                                    }}
+                                    className="prose prose-sm max-w-none"
+                                  />
+                                  <span className="text-xs text-gray-400 mt-1 block">
+                                    {formatTimestamp(comment.timestamp)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
 
