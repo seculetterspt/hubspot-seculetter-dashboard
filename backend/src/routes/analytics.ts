@@ -4,6 +4,148 @@ import { summaryService } from '../services/openai/SummaryService.js';
 
 const router = Router();
 
+// 딜 요약 (파이프라인별 스테이지 정리)
+router.get('/deal-summary', async (req: Request, res: Response) => {
+  try {
+    const { pipelineId, year } = req.query;
+    const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+
+    // 파이프라인 정보 조회
+    const pipelines = await hubspotClient.getDealPipelines();
+
+    // 모든 딜 조회 (페이지네이션 처리)
+    let allDeals: any[] = [];
+    let after: string | undefined = undefined;
+
+    do {
+      const dealsResponse = await hubspotClient.getDeals(100, after);
+      allDeals = allDeals.concat(dealsResponse.results);
+      after = dealsResponse.paging?.next?.after;
+    } while (after);
+
+    // Owner 정보 조회
+    const ownersResponse = await hubspotClient.getOwners();
+    const ownersMap = new Map<string, string>();
+    ownersResponse.results.forEach((owner: any) => {
+      const name = `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || owner.email || '(담당자 없음)';
+      ownersMap.set(owner.id, name);
+    });
+
+    // 파이프라인별로 데이터 구성
+    const pipelineData = pipelines.results.map((pipeline: any) => {
+      // 해당 파이프라인의 딜만 필터링
+      const pipelineDeals = allDeals.filter(deal => {
+        const dealPipeline = deal.properties.pipeline;
+        const closeDate = deal.properties.closedate ? new Date(deal.properties.closedate) : null;
+
+        // 파이프라인 매칭 확인
+        if (dealPipeline !== pipeline.id) return false;
+
+        // 연도 필터링 (closedate 기준)
+        if (closeDate) {
+          return closeDate.getFullYear() === targetYear;
+        }
+
+        return true; // closedate 없는 경우 포함
+      });
+
+      // 스테이지별로 그룹화
+      const stageMap = new Map<string, any>();
+      pipeline.stages.forEach((stage: any) => {
+        stageMap.set(stage.id, {
+          id: stage.id,
+          label: stage.label,
+          displayOrder: stage.displayOrder,
+          probability: parseFloat(stage.metadata?.probability || '0'),
+          deals: [],
+          totalAmount: 0,
+          weightedAmount: 0,
+          count: 0
+        });
+      });
+
+      // 딜을 스테이지별로 분류
+      pipelineDeals.forEach(deal => {
+        const stageId = deal.properties.dealstage;
+        const stage = stageMap.get(stageId);
+        if (stage) {
+          const amount = parseFloat(deal.properties.amount) || 0;
+          const probability = stage.probability / 100;
+
+          // Association 정보 조회를 위한 데이터 준비
+          const dealData = {
+            id: deal.id,
+            name: deal.properties.dealname || '(거래명 없음)',
+            amount,
+            weightedAmount: amount * probability,
+            closeDate: deal.properties.closedate,
+            createDate: deal.properties.createdate,
+            lastModified: deal.properties.hs_lastmodifieddate,
+            ownerId: deal.properties.hubspot_owner_id,
+            ownerName: deal.properties.hubspot_owner_id
+              ? ownersMap.get(deal.properties.hubspot_owner_id) || '(담당자 없음)'
+              : '(담당자 없음)',
+            probability: stage.probability
+          };
+
+          stage.deals.push(dealData);
+          stage.totalAmount += amount;
+          stage.weightedAmount += dealData.weightedAmount;
+          stage.count++;
+        }
+      });
+
+      // 스테이지 배열로 변환 및 정렬
+      const stages = Array.from(stageMap.values()).sort(
+        (a, b) => a.displayOrder - b.displayOrder
+      );
+
+      // 각 스테이지의 딜을 금액 순으로 정렬
+      stages.forEach(stage => {
+        stage.deals.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
+      });
+
+      // 파이프라인 합계 계산
+      const pipelineTotals = stages.reduce(
+        (acc, stage) => ({
+          totalAmount: acc.totalAmount + stage.totalAmount,
+          weightedAmount: acc.weightedAmount + stage.weightedAmount,
+          totalCount: acc.totalCount + stage.count,
+          closedWonAmount: stage.probability === 100 ? acc.closedWonAmount + stage.totalAmount : acc.closedWonAmount,
+          openAmount: stage.probability < 100 && stage.probability > 0 ? acc.openAmount + stage.totalAmount : acc.openAmount
+        }),
+        { totalAmount: 0, weightedAmount: 0, totalCount: 0, closedWonAmount: 0, openAmount: 0 }
+      );
+
+      return {
+        id: pipeline.id,
+        label: pipeline.label,
+        stages,
+        totals: pipelineTotals
+      };
+    });
+
+    // 특정 파이프라인만 요청된 경우 필터링
+    const result = pipelineId
+      ? pipelineData.filter((p: any) => p.id === pipelineId)
+      : pipelineData;
+
+    res.json({
+      year: targetYear,
+      pipelines: result,
+      summary: {
+        totalPipelines: result.length,
+        totalDeals: result.reduce((acc: number, p: any) => acc + p.totals.totalCount, 0),
+        totalAmount: result.reduce((acc: number, p: any) => acc + p.totals.totalAmount, 0),
+        totalWeightedAmount: result.reduce((acc: number, p: any) => acc + p.totals.weightedAmount, 0)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching deal summary:', error);
+    res.status(500).json({ error: 'Failed to fetch deal summary' });
+  }
+});
+
 // 활동 타임라인 (날짜 범위 기반) - 회사 연결 정보 포함
 router.get('/activity-timeline', async (req: Request, res: Response) => {
   try {
