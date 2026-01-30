@@ -29,7 +29,6 @@ services:
   - type: web
     name: seculetter-hubspot-dashboard
     runtime: static
-    plan: free
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     routes:
