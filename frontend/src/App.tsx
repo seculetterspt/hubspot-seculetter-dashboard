@@ -7,6 +7,7 @@ import ActivitiesPage from './pages/ActivitiesPage'
 import ForecastPage from './pages/ForecastPage'
 import PocPage from './pages/PocPage'
 import TodayModifiedPage from './pages/TodayModifiedPage'
+import DailyComparisonPage from './pages/DailyComparisonPage'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
       <Routes>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/today" element={<TodayModifiedPage />} />
+        <Route path="/comparison" element={<DailyComparisonPage />} />
         <Route path="/deals" element={<DealsPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/activities" element={<ActivitiesPage />} />

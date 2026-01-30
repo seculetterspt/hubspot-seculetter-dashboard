@@ -169,6 +169,183 @@ router.get('/today-modified', async (req: Request, res: Response) => {
   });
 });
 
+// 어제 vs 오늘 스냅샷 비교
+router.get('/daily-comparison', async (req: Request, res: Response) => {
+  // 오늘 실제 데이터 가져오기
+  let todayContacts: any[] = [];
+  let todayCompanies: any[] = [];
+  let todayDeals: any[] = [];
+  let todayTickets: any[] = [];
+
+  try {
+    const contactsRes = await hubspotClient.getContacts(100);
+    todayContacts = contactsRes.results.map(c => ({
+      id: c.id,
+      name: `${c.properties.firstname || ''} ${c.properties.lastname || ''}`.trim() || '(이름 없음)',
+      email: c.properties.email || '-',
+      company: c.properties.company || '-',
+      lifecycleStage: c.properties.lifecyclestage || '-',
+      source: c.properties.hs_analytics_source || '-',
+      modifiedAt: c.properties.lastmodifieddate,
+      createdAt: c.properties.createdate
+    }));
+  } catch (error) {
+    console.error('Error fetching contacts:', error);
+  }
+
+  try {
+    const companiesRes = await hubspotClient.getCompanies(100);
+    todayCompanies = companiesRes.results.map(c => ({
+      id: c.id,
+      name: c.properties.name || '(이름 없음)',
+      domain: c.properties.domain || '-',
+      industry: c.properties.industry || '-',
+      employees: c.properties.numberofemployees || '-',
+      modifiedAt: c.properties.lastmodifieddate,
+      createdAt: c.properties.createdate
+    }));
+  } catch (error) {
+    console.error('Error fetching companies:', error);
+  }
+
+  try {
+    const dealsRes = await hubspotClient.getDeals(100);
+    todayDeals = dealsRes.results.map(d => ({
+      id: d.id,
+      name: d.properties.dealname || '(이름 없음)',
+      amount: d.properties.amount ? Number(d.properties.amount) : 0,
+      stage: d.properties.dealstage || '-',
+      pipeline: d.properties.pipeline || '-',
+      closeDate: d.properties.closedate || '-',
+      modifiedAt: d.properties.hs_lastmodifieddate,
+      createdAt: d.properties.createdate
+    }));
+  } catch (error) {
+    console.error('Error fetching deals:', error);
+  }
+
+  try {
+    const ticketsRes = await hubspotClient.getTickets(100);
+    todayTickets = ticketsRes.results.map(t => ({
+      id: t.id,
+      subject: t.properties.subject || '(제목 없음)',
+      priority: t.properties.hs_ticket_priority || '-',
+      status: t.properties.hs_pipeline_stage || '-',
+      modifiedAt: t.properties.hs_lastmodifieddate,
+      createdAt: t.properties.createdate
+    }));
+  } catch (error) {
+    console.error('Error fetching tickets:', error);
+  }
+
+  // 어제 더미 데이터 생성 (오늘 데이터 기준으로 약간 변형)
+  const generateYesterdayDummy = (todayData: any[], type: string) => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString();
+
+    // 오늘 데이터에서 일부 제거 (새로 추가된 것처럼)
+    const removedCount = Math.floor(todayData.length * 0.1); // 10% 새로 추가됨
+    const yesterdayData = todayData.slice(removedCount).map(item => ({
+      ...item,
+      modifiedAt: yesterdayStr
+    }));
+
+    return yesterdayData;
+  };
+
+  const yesterdayContacts = generateYesterdayDummy(todayContacts, 'contacts');
+  const yesterdayCompanies = generateYesterdayDummy(todayCompanies, 'companies');
+  const yesterdayDeals = generateYesterdayDummy(todayDeals, 'deals');
+  const yesterdayTickets = generateYesterdayDummy(todayTickets, 'tickets');
+
+  // 변화 계산
+  const calculateChanges = (today: any[], yesterday: any[]) => {
+    const todayIds = new Set(today.map(i => i.id));
+    const yesterdayIds = new Set(yesterday.map(i => i.id));
+
+    const added = today.filter(i => !yesterdayIds.has(i.id));
+    const removed = yesterday.filter(i => !todayIds.has(i.id));
+    const common = today.filter(i => yesterdayIds.has(i.id));
+
+    return {
+      added: added.length,
+      removed: removed.length,
+      modified: Math.floor(common.length * 0.2), // 가정: 공통 항목 중 20%가 수정됨
+      unchanged: common.length - Math.floor(common.length * 0.2),
+      addedItems: added,
+      removedItems: removed
+    };
+  };
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  res.json({
+    dates: {
+      today: today.toISOString().split('T')[0],
+      yesterday: yesterday.toISOString().split('T')[0]
+    },
+    summary: {
+      contacts: {
+        today: todayContacts.length,
+        yesterday: yesterdayContacts.length,
+        change: todayContacts.length - yesterdayContacts.length,
+        changePercent: yesterdayContacts.length > 0
+          ? ((todayContacts.length - yesterdayContacts.length) / yesterdayContacts.length * 100).toFixed(1)
+          : 0
+      },
+      companies: {
+        today: todayCompanies.length,
+        yesterday: yesterdayCompanies.length,
+        change: todayCompanies.length - yesterdayCompanies.length,
+        changePercent: yesterdayCompanies.length > 0
+          ? ((todayCompanies.length - yesterdayCompanies.length) / yesterdayCompanies.length * 100).toFixed(1)
+          : 0
+      },
+      deals: {
+        today: todayDeals.length,
+        yesterday: yesterdayDeals.length,
+        change: todayDeals.length - yesterdayDeals.length,
+        changePercent: yesterdayDeals.length > 0
+          ? ((todayDeals.length - yesterdayDeals.length) / yesterdayDeals.length * 100).toFixed(1)
+          : 0,
+        todayValue: todayDeals.reduce((sum, d) => sum + (d.amount || 0), 0),
+        yesterdayValue: yesterdayDeals.reduce((sum, d) => sum + (d.amount || 0), 0)
+      },
+      tickets: {
+        today: todayTickets.length,
+        yesterday: yesterdayTickets.length,
+        change: todayTickets.length - yesterdayTickets.length,
+        changePercent: yesterdayTickets.length > 0
+          ? ((todayTickets.length - yesterdayTickets.length) / yesterdayTickets.length * 100).toFixed(1)
+          : 0
+      }
+    },
+    details: {
+      contacts: calculateChanges(todayContacts, yesterdayContacts),
+      companies: calculateChanges(todayCompanies, yesterdayCompanies),
+      deals: calculateChanges(todayDeals, yesterdayDeals),
+      tickets: calculateChanges(todayTickets, yesterdayTickets)
+    },
+    data: {
+      today: {
+        contacts: todayContacts,
+        companies: todayCompanies,
+        deals: todayDeals,
+        tickets: todayTickets
+      },
+      yesterday: {
+        contacts: yesterdayContacts,
+        companies: yesterdayCompanies,
+        deals: yesterdayDeals,
+        tickets: yesterdayTickets
+      }
+    }
+  });
+});
+
 // 오버뷰 KPI 데이터
 router.get('/overview', async (req: Request, res: Response) => {
   try {
