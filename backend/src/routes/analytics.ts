@@ -289,7 +289,8 @@ router.get('/activity-summary', async (req: Request, res: Response) => {
 // 활동 타임라인 (날짜 범위 기반) - 회사 연결 정보 포함
 router.get('/activity-timeline', async (req: Request, res: Response) => {
   try {
-    const { from, to, generateSummaries } = req.query;
+    const { from, to, generateSummaries, includeAssociations } = req.query;
+    const shouldIncludeAssociations = includeAssociations === 'true' || generateSummaries === 'true';
 
     // 기본값: 2주 전 ~ 2주 후
     const now = new Date();
@@ -319,6 +320,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
     }
 
     const activities: ActivityItem[] = [];
+    const emptyAssociations = { companies: [], contacts: [], deals: [] };
 
     // 전화 조회
     try {
@@ -331,7 +333,6 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       for (const call of filteredCalls) {
         const timestamp = call.properties.hs_timestamp || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-        const associations = await hubspotClient.getActivityAssociations('calls', call.id);
 
         activities.push({
           id: call.id,
@@ -340,7 +341,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: call.properties.hs_call_body || '',
           timestamp,
           date,
-          associations
+          associations: emptyAssociations
         });
       }
     } catch (error) {
@@ -358,7 +359,6 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       for (const note of filteredNotes) {
         const timestamp = note.properties.hs_timestamp || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-        const associations = await hubspotClient.getActivityAssociations('notes', note.id);
 
         activities.push({
           id: note.id,
@@ -367,7 +367,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: note.properties.hs_note_body || '',
           timestamp,
           date,
-          associations
+          associations: emptyAssociations
         });
       }
     } catch (error) {
@@ -385,7 +385,6 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       for (const meeting of filteredMeetings) {
         const timestamp = meeting.properties.hs_meeting_start_time || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-        const associations = await hubspotClient.getActivityAssociations('meetings', meeting.id);
 
         activities.push({
           id: meeting.id,
@@ -394,7 +393,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: meeting.properties.hs_meeting_body || '',
           timestamp,
           date,
-          associations
+          associations: emptyAssociations
         });
       }
     } catch (error) {
@@ -417,7 +416,6 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       for (const email of filteredEmails) {
         const timestamp = email.properties.hs_timestamp || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-        const associations = await hubspotClient.getActivityAssociations('emails', email.id);
 
         activities.push({
           id: email.id,
@@ -426,11 +424,28 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: email.properties.hs_email_text || '',
           timestamp,
           date,
-          associations
+          associations: emptyAssociations
         });
       }
     } catch (error) {
       console.error('Error fetching emails for timeline:', error);
+    }
+
+    // Association 조회 (필요한 경우에만, 병렬 처리)
+    if (shouldIncludeAssociations && activities.length > 0) {
+      console.log(`Fetching associations for ${activities.length} activities...`);
+      const associationPromises = activities.map(async (activity) => {
+        const objectType = activity.type === 'call' ? 'calls' :
+                          activity.type === 'note' ? 'notes' :
+                          activity.type === 'meeting' ? 'meetings' : 'emails';
+        try {
+          const assoc = await hubspotClient.getActivityAssociations(objectType, activity.id);
+          activity.associations = assoc;
+        } catch (e) {
+          // 개별 association 조회 실패 시 무시
+        }
+      });
+      await Promise.all(associationPromises);
     }
 
     // AI 요약 생성
