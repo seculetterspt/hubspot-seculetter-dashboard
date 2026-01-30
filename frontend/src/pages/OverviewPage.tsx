@@ -7,8 +7,7 @@ import {
   Calendar,
   Phone,
   FileText,
-  Clock,
-  DollarSign
+  Clock
 } from 'lucide-react'
 import KPICard from '../components/widgets/KPICard/KPICard'
 import { api } from '../services/api'
