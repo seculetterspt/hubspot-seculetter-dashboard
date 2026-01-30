@@ -54,14 +54,11 @@ export default function ActivityTimelinePage() {
     }
   }, [])
 
-  const fetchData = async (withSummaries = false) => {
-    if (withSummaries) {
-      setSummariesLoading(true)
-    } else {
-      setLoading(true)
-    }
+  // 초기 로딩 (association 없이 빠르게)
+  const fetchData = async () => {
+    setLoading(true)
     try {
-      const url = `/analytics/activity-timeline?from=${dateRange.from}&to=${dateRange.to}${withSummaries ? '&generateSummaries=true' : ''}`
+      const url = `/analytics/activity-timeline?from=${dateRange.from}&to=${dateRange.to}`
       const res = await api.get(url)
       setData(res.data)
 
@@ -70,7 +67,6 @@ export default function ActivityTimelinePage() {
         if (res.data.dates.includes(today)) {
           setSelectedDate(today)
         } else {
-          // 오늘과 가장 가까운 날짜 찾기
           const sorted = [...res.data.dates].sort((a, b) => {
             const diffA = Math.abs(new Date(a).getTime() - new Date(today).getTime())
             const diffB = Math.abs(new Date(b).getTime() - new Date(today).getTime())
@@ -83,12 +79,37 @@ export default function ActivityTimelinePage() {
       console.error('Error:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // AI 요약 생성 (선택된 날짜만)
+  const fetchWithSummaries = async () => {
+    if (!selectedDate) return
+    setSummariesLoading(true)
+    try {
+      // 선택된 날짜만 조회 (association + AI 요약)
+      const url = `/analytics/activity-timeline?from=${selectedDate}&to=${selectedDate}&includeAssociations=true&generateSummaries=true`
+      const res = await api.get(url)
+
+      // 선택된 날짜의 데이터만 업데이트
+      if (data && res.data.activitiesByDate[selectedDate]) {
+        setData({
+          ...data,
+          activitiesByDate: {
+            ...data.activitiesByDate,
+            [selectedDate]: res.data.activitiesByDate[selectedDate]
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    } finally {
       setSummariesLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchData(false)
+    fetchData()
   }, [])
 
   const formatDate = (dateStr: string) => {
@@ -165,8 +186,8 @@ export default function ActivityTimelinePage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => fetchData(true)}
-            disabled={summariesLoading}
+            onClick={fetchWithSummaries}
+            disabled={summariesLoading || !selectedDate}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
           >
             {summariesLoading ? (
@@ -182,7 +203,7 @@ export default function ActivityTimelinePage() {
             )}
           </button>
           <button
-            onClick={() => fetchData(false)}
+            onClick={fetchData}
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
           >
             <RefreshCw size={18} />

@@ -430,8 +430,9 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       console.error('Error fetching emails for timeline:', error);
     }
 
-    // Association 조회 (항상 조회, 병렬 처리로 속도 개선)
-    if (activities.length > 0) {
+    // Association 조회 (선택적, generateSummaries 요청 시에만)
+    const shouldFetchAssociations = req.query.includeAssociations === 'true' || generateSummaries === 'true';
+    if (shouldFetchAssociations && activities.length > 0) {
       console.log(`Fetching associations for ${activities.length} activities...`);
       // 병렬 처리하되 동시 요청 수 제한 (10개씩)
       const batchSize = 10;
