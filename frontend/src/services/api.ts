@@ -64,6 +64,27 @@ export const analyticsApi = {
     const queryString = params.toString()
     return api.get(`/analytics/deal-recent-activities${queryString ? `?${queryString}` : ''}`)
   },
+  // 통합된 활동 타임라인 API (딜별 그룹화 지원)
+  getActivityTimelineWithDeals: (options: {
+    from?: string
+    to?: string
+    year?: number
+    pipelineId?: string
+    includeAssociations?: boolean
+    groupByDeals?: boolean
+    generateSummaries?: boolean
+  }) => {
+    const params = new URLSearchParams()
+    if (options.from) params.append('from', options.from)
+    if (options.to) params.append('to', options.to)
+    if (options.year) params.append('year', options.year.toString())
+    if (options.pipelineId) params.append('pipelineId', options.pipelineId)
+    if (options.includeAssociations) params.append('includeAssociations', 'true')
+    if (options.groupByDeals) params.append('groupByDeals', 'true')
+    if (options.generateSummaries) params.append('generateSummaries', 'true')
+    const queryString = params.toString()
+    return api.get(`/analytics/activity-timeline${queryString ? `?${queryString}` : ''}`)
+  },
 }
 
 export default api
