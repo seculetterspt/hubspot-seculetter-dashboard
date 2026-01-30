@@ -49,6 +49,13 @@ export const analyticsApi = {
   getTickets: () => api.get('/analytics/tickets'),
   getActivities: () => api.get('/analytics/activities'),
   getTodayModified: () => api.get('/analytics/today-modified'),
+  getDealSummary: (year?: number, pipelineId?: string) => {
+    const params = new URLSearchParams()
+    if (year) params.append('year', year.toString())
+    if (pipelineId) params.append('pipelineId', pipelineId)
+    const queryString = params.toString()
+    return api.get(`/analytics/deal-summary${queryString ? `?${queryString}` : ''}`)
+  },
 }
 
 export default api
