@@ -6,12 +6,14 @@ import ContactsPage from './pages/ContactsPage'
 import ActivitiesPage from './pages/ActivitiesPage'
 import ForecastPage from './pages/ForecastPage'
 import PocPage from './pages/PocPage'
+import TodayModifiedPage from './pages/TodayModifiedPage'
 
 function App() {
   return (
     <Layout>
       <Routes>
         <Route path="/" element={<OverviewPage />} />
+        <Route path="/today" element={<TodayModifiedPage />} />
         <Route path="/deals" element={<DealsPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/activities" element={<ActivitiesPage />} />

@@ -1,8 +1,142 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../config/database.js';
 import { dailySnapshotService } from '../services/analytics/DailySnapshot.js';
+import { hubspotClient } from '../services/hubspot/HubspotClient.js';
 
 const router = Router();
+
+// 오늘 수정된 데이터 (오브젝트별 테이블)
+router.get('/today-modified', async (req: Request, res: Response) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 연락처
+    const contactsRes = await hubspotClient.getContacts(100);
+    const modifiedContacts = contactsRes.results
+      .filter(c => {
+        const modDate = c.properties.lastmodifieddate ? new Date(c.properties.lastmodifieddate) : null;
+        return modDate && modDate >= today;
+      })
+      .map(c => ({
+        id: c.id,
+        name: `${c.properties.firstname || ''} ${c.properties.lastname || ''}`.trim() || '(이름 없음)',
+        email: c.properties.email || '-',
+        company: c.properties.company || '-',
+        lifecycleStage: c.properties.lifecyclestage || '-',
+        source: c.properties.hs_analytics_source || '-',
+        modifiedAt: c.properties.lastmodifieddate,
+        createdAt: c.properties.createdate
+      }));
+
+    // 회사
+    const companiesRes = await hubspotClient.getCompanies(100);
+    const modifiedCompanies = companiesRes.results
+      .filter(c => {
+        const modDate = c.properties.lastmodifieddate ? new Date(c.properties.lastmodifieddate) : null;
+        return modDate && modDate >= today;
+      })
+      .map(c => ({
+        id: c.id,
+        name: c.properties.name || '(이름 없음)',
+        domain: c.properties.domain || '-',
+        industry: c.properties.industry || '-',
+        employees: c.properties.numberofemployees || '-',
+        modifiedAt: c.properties.lastmodifieddate,
+        createdAt: c.properties.createdate
+      }));
+
+    // 거래
+    const dealsRes = await hubspotClient.getDeals(100);
+    const modifiedDeals = dealsRes.results
+      .filter(d => {
+        const modDate = d.properties.hs_lastmodifieddate ? new Date(d.properties.hs_lastmodifieddate) : null;
+        return modDate && modDate >= today;
+      })
+      .map(d => ({
+        id: d.id,
+        name: d.properties.dealname || '(이름 없음)',
+        amount: d.properties.amount ? Number(d.properties.amount) : 0,
+        stage: d.properties.dealstage || '-',
+        pipeline: d.properties.pipeline || '-',
+        closeDate: d.properties.closedate || '-',
+        modifiedAt: d.properties.hs_lastmodifieddate,
+        createdAt: d.properties.createdate
+      }));
+
+    // 티켓
+    const ticketsRes = await hubspotClient.getTickets(100);
+    const modifiedTickets = ticketsRes.results
+      .filter(t => {
+        const modDate = t.properties.hs_lastmodifieddate ? new Date(t.properties.hs_lastmodifieddate) : null;
+        return modDate && modDate >= today;
+      })
+      .map(t => ({
+        id: t.id,
+        subject: t.properties.subject || '(제목 없음)',
+        priority: t.properties.hs_ticket_priority || '-',
+        status: t.properties.hs_pipeline_stage || '-',
+        modifiedAt: t.properties.hs_lastmodifieddate,
+        createdAt: t.properties.createdate
+      }));
+
+    // 미팅
+    const meetingsRes = await hubspotClient.getMeetings(100);
+    const todayMeetings = meetingsRes.results.map(m => ({
+      id: m.id,
+      title: m.properties.hs_meeting_title || '(제목 없음)',
+      startTime: m.properties.hs_meeting_start_time || '-',
+      endTime: m.properties.hs_meeting_end_time || '-',
+      outcome: m.properties.hs_meeting_outcome || '-'
+    }));
+
+    // 통화
+    const callsRes = await hubspotClient.getCalls(100);
+    const todayCalls = callsRes.results.map(c => ({
+      id: c.id,
+      title: c.properties.hs_call_title || '(제목 없음)',
+      duration: c.properties.hs_call_duration || '-',
+      status: c.properties.hs_call_status || '-',
+      timestamp: c.properties.hs_timestamp || '-'
+    }));
+
+    // 메모
+    const notesRes = await hubspotClient.getNotes(100);
+    const todayNotes = notesRes.results.map(n => ({
+      id: n.id,
+      body: (n.properties.hs_note_body || '').substring(0, 100) + '...',
+      timestamp: n.properties.hs_timestamp || '-'
+    }));
+
+    res.json({
+      date: today.toISOString().split('T')[0],
+      contacts: {
+        count: modifiedContacts.length,
+        items: modifiedContacts
+      },
+      companies: {
+        count: modifiedCompanies.length,
+        items: modifiedCompanies
+      },
+      deals: {
+        count: modifiedDeals.length,
+        items: modifiedDeals
+      },
+      tickets: {
+        count: modifiedTickets.length,
+        items: modifiedTickets
+      },
+      activities: {
+        meetings: { count: todayMeetings.length, items: todayMeetings },
+        calls: { count: todayCalls.length, items: todayCalls },
+        notes: { count: todayNotes.length, items: todayNotes }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching today modified data:', error);
+    res.status(500).json({ error: 'Failed to fetch today modified data' });
+  }
+});
 
 // 오버뷰 KPI 데이터
 router.get('/overview', async (req: Request, res: Response) => {

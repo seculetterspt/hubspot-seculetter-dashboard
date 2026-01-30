@@ -11,7 +11,8 @@ import {
   X,
   RefreshCw,
   Bell,
-  Settings
+  Settings,
+  CalendarClock
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -20,6 +21,7 @@ interface LayoutProps {
 
 const navItems = [
   { path: '/', label: '오버뷰', icon: LayoutDashboard },
+  { path: '/today', label: '오늘 수정된 데이터', icon: CalendarClock },
   { path: '/deals', label: '거래 관리', icon: Handshake },
   { path: '/forecast', label: '영업 예측', icon: TrendingUp },
   { path: '/poc', label: 'POC/BMT', icon: FlaskConical },

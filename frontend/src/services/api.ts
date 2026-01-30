@@ -48,6 +48,7 @@ export const analyticsApi = {
   getCompanies: () => api.get('/analytics/companies'),
   getTickets: () => api.get('/analytics/tickets'),
   getActivities: () => api.get('/analytics/activities'),
+  getTodayModified: () => api.get('/analytics/today-modified'),
 }
 
 export default api
