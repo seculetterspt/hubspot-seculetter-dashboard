@@ -410,6 +410,21 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
         });
       });
 
+      console.log(`[Deal Grouping] Total deals: ${allDeals.length}, Filtered deals: ${dealMap.size}`);
+      console.log(`[Deal Grouping] Target year: ${targetYear}, Pipeline: ${pipelineId || 'all'}`);
+
+      // 활동에서 딜 연결 확인
+      const activitiesWithDeals = activities.filter(a => a.associations.deals.length > 0);
+      console.log(`[Deal Grouping] Activities with deal associations: ${activitiesWithDeals.length}/${activities.length}`);
+
+      if (activitiesWithDeals.length > 0) {
+        console.log(`[Deal Grouping] Sample activity deal IDs:`, activitiesWithDeals.slice(0, 5).map(a => ({
+          activityId: a.id,
+          dealId: a.associations.deals[0]?.id,
+          dealName: a.associations.deals[0]?.name
+        })));
+      }
+
       // 딜에 연결된 활동 필터링 및 그룹화
       const dealActivityMap = new Map<string, {
         deal: any;
