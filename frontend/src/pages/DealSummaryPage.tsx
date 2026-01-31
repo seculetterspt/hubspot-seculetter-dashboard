@@ -82,6 +82,32 @@ interface DealRecentActivitiesData {
   deals: DealRecentActivity[]
 }
 
+// 딜 이름에서 실제 고객사 추출 (괄호 안 또는 첫 부분)
+const extractCustomerName = (dealName: string, partnerCompany?: string): string => {
+  // 괄호 안에 고객사가 있는 경우: "파트너사(고객사) - 제품"
+  const parenMatch = dealName.match(/\(([^)]+)\)/)
+  if (parenMatch) {
+    return parenMatch[1]
+  }
+
+  // 하이픈 앞이 회사명인 경우: "고객사 - 제품"
+  const hyphenParts = dealName.split(' - ')
+  if (hyphenParts.length > 1) {
+    const firstPart = hyphenParts[0].trim()
+    // 파트너사와 다르면 그게 고객사
+    if (partnerCompany && firstPart !== partnerCompany) {
+      return firstPart
+    }
+    // 파트너사가 없으면 첫 부분을 고객사로 사용
+    if (!partnerCompany) {
+      return firstPart
+    }
+  }
+
+  // 기본값: 연결된 회사명 또는 딜 이름의 첫 부분
+  return partnerCompany || dealName.split(' - ')[0] || dealName
+}
+
 // 금액 포맷 함수 (억/만원 단위)
 const formatAmount = (amount: number): string => {
   if (amount >= 100000000) {
@@ -456,7 +482,7 @@ export default function DealSummaryPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <Building2 size={16} className="text-blue-500" />
                         <span className="font-semibold text-gray-900 truncate">
-                          {deal.companyName || '(회사명 없음)'}
+                          {extractCustomerName(deal.dealName, deal.companyName)}
                         </span>
                       </div>
                       <a
@@ -507,7 +533,7 @@ export default function DealSummaryPage() {
                             <Sparkles size={12} />
                             <span className="font-medium">AI 요약</span>
                           </div>
-                          <p className="text-gray-800 text-sm leading-relaxed">{deal.aiSummary}</p>
+                          <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-line">{deal.aiSummary}</p>
                         </div>
                       ) : (
                         <div className="bg-gray-50 rounded-lg p-4 text-gray-500 text-sm">
