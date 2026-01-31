@@ -227,6 +227,8 @@ export default function DealSummaryPage() {
 
   useEffect(() => {
     if (selectedPipeline) {
+      // 파이프라인 변경 시 기존 활동 데이터 초기화 (로딩 표시)
+      setRecentActivities(null)
       fetchRecentActivities(selectedPipeline)
     }
   }, [selectedPipeline, selectedYear])
@@ -528,7 +530,12 @@ export default function DealSummaryPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">최근 2주간 주요 활동 업데이트</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                최근 2주간 주요 활동 업데이트
+                <span className="ml-2 text-base font-normal text-purple-600">
+                  ({currentPipeline.label})
+                </span>
+              </h2>
               <p className="text-sm text-gray-500 mt-1">
                 {recentActivities?.dateRange?.from} ~ {recentActivities?.dateRange?.to} |
                 {recentActivities?.totalDeals || 0}개 딜에서 활동 발생
