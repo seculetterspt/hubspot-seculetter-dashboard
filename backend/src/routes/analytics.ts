@@ -392,8 +392,8 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
     const shouldFetchAssociations = req.query.includeAssociations === 'true' || generateSummaries === 'true';
     if (shouldFetchAssociations && activities.length > 0) {
       console.log(`Fetching associations and comments for ${activities.length} activities...`);
-      // 병렬 처리하되 동시 요청 수 제한 (10개씩)
-      const batchSize = 10;
+      // 병렬 처리하되 동시 요청 수 제한 (5개씩, Rate limit 방지)
+      const batchSize = 5;
       for (let i = 0; i < activities.length; i += batchSize) {
         const batch = activities.slice(i, i + batchSize);
         const associationPromises = batch.map(async (activity) => {
@@ -410,12 +410,22 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
               const comments = await hubspotClient.getActivityNotes(objectType, activity.id);
               activity.comments = comments;
             }
-          } catch (e) {
-            // 개별 association 조회 실패 시 무시
+          } catch (e: any) {
+            console.error(`[Association Error] ${objectType}/${activity.id}: ${e.message}`);
           }
         });
         await Promise.all(associationPromises);
+        // 배치 간 딜레이 (Rate limit 방지)
+        if (i + batchSize < activities.length) {
+          await delay(300);
+        }
       }
+      // 연결된 활동 통계 로그
+      const withDeals = activities.filter(a => a.associations.deals.length > 0);
+      const meetings = activities.filter(a => a.type === 'meeting');
+      const meetingsWithDeals = meetings.filter(m => m.associations.deals.length > 0);
+      console.log(`[Associations] Total: ${activities.length}, With deals: ${withDeals.length}`);
+      console.log(`[Associations] Meetings: ${meetings.length}, Meetings with deals: ${meetingsWithDeals.length}`);
     }
 
     // AI 요약 생성 (DB 캐싱 적용)
