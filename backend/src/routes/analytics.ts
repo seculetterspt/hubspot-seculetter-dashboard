@@ -665,7 +665,7 @@ ${activityTexts}
             activityCount: entry.activities.length,
             latestActivityDate: entry.latestActivityDate,
             aiSummary: aiResult?.summary || '',
-            activities: entry.activities.slice(0, 3).map(a => ({
+            activities: entry.activities.slice(0, 5).map(a => ({
               type: a.type,
               title: a.title,
               date: a.date
@@ -682,7 +682,7 @@ ${activityTexts}
           activityCount: entry.activities.length,
           latestActivityDate: entry.latestActivityDate,
           aiSummary: '',
-          activities: entry.activities.slice(0, 3).map(a => ({
+          activities: entry.activities.slice(0, 5).map(a => ({
             type: a.type,
             title: a.title,
             date: a.date
