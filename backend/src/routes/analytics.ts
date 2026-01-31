@@ -247,6 +247,12 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
     fromDate.setHours(0, 0, 0, 0);
     toDate.setHours(23, 59, 59, 999);
 
+    interface ActivityNote {
+      id: string;
+      body: string;
+      timestamp: string;
+    }
+
     interface ActivityItem {
       id: string;
       type: 'call' | 'note' | 'meeting' | 'email';
@@ -259,6 +265,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
         contacts: { id: string; name: string }[];
         deals: { id: string; name: string }[];
       };
+      comments: ActivityNote[];
       aiSummary?: string;
     }
 
@@ -284,7 +291,8 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: call.properties.hs_call_body || '',
           timestamp,
           date,
-          associations: emptyAssociations
+          associations: emptyAssociations,
+          comments: []
         });
       }
     } catch (error) {
@@ -310,7 +318,8 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: note.properties.hs_note_body || '',
           timestamp,
           date,
-          associations: emptyAssociations
+          associations: emptyAssociations,
+          comments: []
         });
       }
     } catch (error) {
@@ -336,14 +345,15 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: meeting.properties.hs_meeting_body || '',
           timestamp,
           date,
-          associations: emptyAssociations
+          associations: emptyAssociations,
+          comments: []
         });
       }
     } catch (error) {
       console.error('Error fetching meetings for timeline:', error);
     }
 
-    // 이메일 조회 (scope 미승인시 무시)
+    // 이메일 조회 (scope 미승인시 조용히 무시)
     try {
       const emailsRes = await hubspotClient.api.crm.objects.basicApi.getPage(
         'emails',
@@ -367,17 +377,21 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: email.properties.hs_email_text || '',
           timestamp,
           date,
-          associations: emptyAssociations
+          associations: emptyAssociations,
+          comments: []
         });
       }
-    } catch (error) {
-      console.error('Error fetching emails for timeline:', error);
+    } catch (error: any) {
+      // 스코프 미승인 에러(403)는 조용히 무시, 다른 에러만 로그
+      if (error?.code !== 403 && error?.body?.category !== 'MISSING_SCOPES') {
+        console.error('Error fetching emails for timeline:', error);
+      }
     }
 
-    // Association 조회 (선택적, generateSummaries 요청 시에만)
+    // Association 및 댓글 조회 (선택적, generateSummaries 요청 시에만)
     const shouldFetchAssociations = req.query.includeAssociations === 'true' || generateSummaries === 'true';
     if (shouldFetchAssociations && activities.length > 0) {
-      console.log(`Fetching associations for ${activities.length} activities...`);
+      console.log(`Fetching associations and comments for ${activities.length} activities...`);
       // 병렬 처리하되 동시 요청 수 제한 (5개씩, Rate limit 방지)
       const batchSize = 5;
       for (let i = 0; i < activities.length; i += batchSize) {
@@ -387,8 +401,15 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
                             activity.type === 'note' ? 'notes' :
                             activity.type === 'meeting' ? 'meetings' : 'emails';
           try {
+            // 회사/연락처/거래 연결 조회
             const assoc = await hubspotClient.getActivityAssociations(objectType, activity.id);
             activity.associations = assoc;
+
+            // 댓글(노트) 조회 (note 타입은 제외 - 자기 자신이 노트이므로)
+            if (activity.type !== 'note') {
+              const comments = await hubspotClient.getActivityNotes(objectType, activity.id);
+              activity.comments = comments;
+            }
           } catch (e: any) {
             console.error(`[Association Error] ${objectType}/${activity.id}: ${e.message}`);
           }
@@ -420,6 +441,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           companyName: a.associations.companies[0]?.name,
           contactName: a.associations.contacts[0]?.name,
           dealName: a.associations.deals[0]?.name,
+          comments: a.comments?.map(c => ({ body: c.body, timestamp: c.timestamp })),
         }));
 
         // DB에서 기존 요약 조회 후 없는 것만 새로 생성하고 저장
