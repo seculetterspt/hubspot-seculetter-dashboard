@@ -432,11 +432,16 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
         companyName: string;
       }>();
 
+      let matchedCount = 0;
+      let unmatchedCount = 0;
+
       activities.forEach(activity => {
         if (activity.associations.deals.length > 0) {
-          const dealId = activity.associations.deals[0].id;
+          // dealId를 문자열로 변환하여 매칭 (타입 불일치 방지)
+          const dealId = String(activity.associations.deals[0].id);
           const deal = dealMap.get(dealId);
           if (deal) {
+            matchedCount++;
             if (!dealActivityMap.has(dealId)) {
               dealActivityMap.set(dealId, {
                 deal,
@@ -449,9 +454,13 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
             if (!entry.companyName && activity.associations.companies[0]?.name) {
               entry.companyName = activity.associations.companies[0].name;
             }
+          } else {
+            unmatchedCount++;
           }
         }
       });
+
+      console.log(`[Deal Grouping] Matched: ${matchedCount}, Unmatched (filtered out): ${unmatchedCount}`);
 
       // 최근 활동 순으로 정렬
       const sortedDealActivities = Array.from(dealActivityMap.values())
