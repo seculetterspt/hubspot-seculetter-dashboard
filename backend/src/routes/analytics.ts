@@ -347,7 +347,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       console.error('Error fetching meetings for timeline:', error);
     }
 
-    // 이메일 조회 (scope 미승인시 무시)
+    // 이메일 조회 (scope 미승인시 조용히 무시)
     try {
       const emailsRes = await hubspotClient.api.crm.objects.basicApi.getPage(
         'emails',
@@ -375,8 +375,11 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           comments: []
         });
       }
-    } catch (error) {
-      console.error('Error fetching emails for timeline:', error);
+    } catch (error: any) {
+      // 스코프 미승인 에러(403)는 조용히 무시, 다른 에러만 로그
+      if (error?.code !== 403 && error?.body?.category !== 'MISSING_SCOPES') {
+        console.error('Error fetching emails for timeline:', error);
+      }
     }
 
     // Association 및 댓글 조회 (선택적, generateSummaries 요청 시에만)
