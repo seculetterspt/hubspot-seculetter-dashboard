@@ -378,8 +378,8 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
     const shouldFetchAssociations = req.query.includeAssociations === 'true' || generateSummaries === 'true';
     if (shouldFetchAssociations && activities.length > 0) {
       console.log(`Fetching associations for ${activities.length} activities...`);
-      // 병렬 처리하되 동시 요청 수 제한 (10개씩)
-      const batchSize = 10;
+      // 병렬 처리하되 동시 요청 수 제한 (5개씩, Rate limit 방지)
+      const batchSize = 5;
       for (let i = 0; i < activities.length; i += batchSize) {
         const batch = activities.slice(i, i + batchSize);
         const associationPromises = batch.map(async (activity) => {
@@ -394,6 +394,10 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           }
         });
         await Promise.all(associationPromises);
+        // 배치 간 딜레이 (Rate limit 방지)
+        if (i + batchSize < activities.length) {
+          await delay(300);
+        }
       }
       // 연결된 활동 통계 로그
       const withDeals = activities.filter(a => a.associations.deals.length > 0);
