@@ -609,8 +609,8 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
             const today = new Date().toISOString().split('T')[0];
 
             // 회사명 추출 + 요약을 한번에 요청 (API 호출 최소화)
+            const activityCount = entry.activities.slice(0, 10).length;
             const prompt = `당신은 영업 활동을 정확하게 요약하는 비서입니다.
-주어진 활동 기록만을 바탕으로 사실에 기반한 요약을 작성하세요.
 
 ## 고객사명 추출
 딜 이름: "${entry.deal.name}"
@@ -619,32 +619,30 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
 - 파트너사(예: 아이앤테크, 휴네시온)가 아닌 실제 고객사를 찾으세요
 - 찾을 수 없으면 "확인필요"
 
-## 활동별 요약
+## 활동별 요약 (중요: 아래 ${activityCount}개 활동을 각각 모두 요약하세요!)
 오늘 날짜: ${today}
-- 오늘 이후 날짜는 "예정"으로 표현
-- 오늘 이전 날짜는 과거형으로 표현
 
-=== 활동 기록 ===
+=== 활동 기록 (총 ${activityCount}개) ===
 ${activityTexts}
 ===
 
-## 응답 형식 (반드시 이 형식으로):
+## 응답 형식:
 고객사: [추출한 고객사명]
 
-• [날짜] [활동유형]: [해당 활동의 핵심 내용 1-2문장 요약]
-• [날짜] [활동유형]: [해당 활동의 핵심 내용 1-2문장 요약]
-(각 활동별로 한 줄씩, 최대 5개)`;
+• [날짜] [활동유형]: [핵심 내용 요약]
+• [날짜] [활동유형]: [핵심 내용 요약]
+(위 ${activityCount}개 활동을 모두 각각 한 줄씩 요약하세요. 생략하지 마세요!)`;
 
             const response = await openai.chat.completions.create({
               model: 'gpt-4o',
               messages: [
                 {
                   role: 'system',
-                  content: '영업 활동을 활동별로 간결하게 요약합니다. 각 활동의 핵심만 1-2문장으로 작성하세요.'
+                  content: '영업 활동을 활동별로 요약합니다. 주어진 활동을 모두 각각 한 줄씩 요약하세요. 절대 활동을 생략하지 마세요.'
                 },
                 { role: 'user', content: prompt }
               ],
-              max_tokens: 400,
+              max_tokens: 600,
               temperature: 0.1
             });
 
