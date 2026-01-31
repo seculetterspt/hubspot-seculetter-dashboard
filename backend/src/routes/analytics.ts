@@ -582,7 +582,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           new Date(b.latestActivityDate).getTime() - new Date(a.latestActivityDate).getTime()
         );
 
-      // AI 요약 생성 (딜별)
+      // AI 요약 생성 (딜별) + 회사명 추출
       if (generateSummaries === 'true' && sortedDealActivities.length > 0) {
         const summaryPromises = sortedDealActivities.map(async (entry) => {
           try {
@@ -597,70 +597,93 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
             }).join('\n\n');
 
             const today = new Date().toISOString().split('T')[0];
+
+            // 회사명 추출 + 요약을 한번에 요청 (API 호출 최소화)
             const prompt = `당신은 영업 활동을 정확하게 요약하는 비서입니다.
-주어진 활동 기록만을 바탕으로 사실에 기반한 요약을 작성하세요.
-절대로 날짜나 내용을 추측하거나 지어내지 마세요. 기록에 없는 정보는 언급하지 마세요.
 
+## 작업 1: 고객사명 추출
+딜 이름에서 실제 고객사(엔드 고객)를 추출하세요.
+- 딜 이름: "${entry.deal.name}"
+- 연결된 회사: "${entry.companyName || '없음'}"
+
+주의:
+- 괄호 안의 "구축형", "SLF", "APT", "CDR" 등은 제품 유형이지 회사명이 아닙니다
+- "아이앤테크", "휴네시온", "구축형" 같은 파트너사/제품유형이 아닌 실제 고객사를 찾으세요
+- 딜 이름에서 실제 고객사명(예: DB손해보험, 출입국사무소, 중앙선거관리위원회, HB저축은행)을 추출하세요
+- 파트너사(고객사) 형식이면 괄호 안이 고객사입니다
+- 찾을 수 없으면 "확인필요"라고 답하세요
+
+## 작업 2: 활동 요약
 오늘 날짜: ${today}
-중요: 오늘 이후의 날짜는 "예정"으로 표현하세요. (예: "2월 5일 미팅 예정", "다음 주 통화 예정")
-오늘 이전의 날짜는 과거형으로 표현하세요. (예: "1월 30일 미팅이 진행됨")
+중요: 오늘 이후의 날짜는 "예정"으로 표현하세요.
+오늘 이전의 날짜는 과거형으로 표현하세요.
 
-거래명: ${entry.deal.name}
-회사: ${entry.companyName || '(정보 없음)'}
 거래 단계: ${entry.deal.stageName}
 
 === 활동 기록 (최신순) ===
 ${activityTexts}
 ===
 
-위 활동 기록을 바탕으로 다음 형식으로 요약해주세요. 각 항목은 반드시 줄바꿈으로 구분하세요:
+## 응답 형식 (반드시 이 형식으로):
+고객사: [추출한 고객사명]
 
-• 최근/예정 활동: [날짜] - [활동 내용] (미래 날짜면 "예정"으로 표시)
-• 진행 상황: [실제 기록에 있는 내용만 작성]
-• 다음 단계: [기록에 언급된 경우에만 작성, 없으면 이 줄 생략]
-
-한국어로 작성하세요. 항목 사이에 반드시 줄바꿈을 넣으세요.`;
+• 최근/예정 활동: [날짜] - [활동 내용]
+• 진행 상황: [실제 기록에 있는 내용만]
+• 다음 단계: [기록에 있는 경우만, 없으면 생략]`;
 
             const response = await openai.chat.completions.create({
               model: 'gpt-4o',
               messages: [
                 {
                   role: 'system',
-                  content: '당신은 정확한 정보만 전달하는 영업 비서입니다. 주어진 데이터에 없는 내용은 절대 추측하거나 생성하지 않습니다. 날짜와 사실관계를 정확히 기록된 대로만 전달합니다.'
+                  content: '당신은 정확한 정보만 전달하는 영업 비서입니다. 주어진 데이터에 없는 내용은 절대 추측하거나 생성하지 않습니다.'
                 },
                 { role: 'user', content: prompt }
               ],
-              max_tokens: 300,
+              max_tokens: 400,
               temperature: 0.1
             });
 
+            const content = response.choices[0]?.message?.content || '';
+
+            // 고객사명 추출
+            const companyMatch = content.match(/고객사:\s*(.+?)(?:\n|$)/);
+            const extractedCompany = companyMatch ? companyMatch[1].trim() : null;
+
+            // 요약 부분 추출 (고객사: 라인 이후)
+            const summaryPart = content.replace(/고객사:\s*.+?\n/, '').trim();
+
             return {
               dealId: entry.deal.id,
-              summary: response.choices[0]?.message?.content || ''
+              summary: summaryPart,
+              extractedCompany: extractedCompany && extractedCompany !== '확인필요' ? extractedCompany : null
             };
           } catch (e) {
-            return { dealId: entry.deal.id, summary: '' };
+            return { dealId: entry.deal.id, summary: '', extractedCompany: null };
           }
         });
 
         const summaries = await Promise.all(summaryPromises);
-        const summaryMap = new Map(summaries.map(s => [s.dealId, s.summary]));
+        const summaryMap = new Map(summaries.map(s => [s.dealId, { summary: s.summary, company: s.extractedCompany }]));
 
-        dealActivities = sortedDealActivities.map(entry => ({
-          dealId: entry.deal.id,
-          dealName: entry.deal.name,
-          companyName: entry.companyName,
-          stageName: entry.deal.stageName,
-          amount: entry.deal.amount,
-          activityCount: entry.activities.length,
-          latestActivityDate: entry.latestActivityDate,
-          aiSummary: summaryMap.get(entry.deal.id) || '',
-          activities: entry.activities.slice(0, 3).map(a => ({
-            type: a.type,
-            title: a.title,
-            date: a.date
-          }))
-        }));
+        dealActivities = sortedDealActivities.map(entry => {
+          const aiResult = summaryMap.get(entry.deal.id);
+          return {
+            dealId: entry.deal.id,
+            dealName: entry.deal.name,
+            companyName: aiResult?.company || entry.companyName || '(확인 필요)',
+            stageName: entry.deal.stageName,
+            amount: entry.deal.amount,
+            activityCount: entry.activities.length,
+            latestActivityDate: entry.latestActivityDate,
+            aiSummary: aiResult?.summary || '',
+            activities: entry.activities.slice(0, 3).map(a => ({
+              type: a.type,
+              title: a.title,
+              date: a.date
+            }))
+          };
+        });
       } else {
         dealActivities = sortedDealActivities.map(entry => ({
           dealId: entry.deal.id,
