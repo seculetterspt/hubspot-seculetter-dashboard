@@ -518,27 +518,46 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       if (generateSummaries === 'true' && sortedDealActivities.length > 0) {
         const summaryPromises = sortedDealActivities.map(async (entry) => {
           try {
-            const activityTexts = entry.activities.slice(0, 5).map(a => {
+            // 활동 내용을 날짜와 함께 상세하게 포함
+            const activityTexts = entry.activities.slice(0, 10).map(a => {
               const typeLabel = a.type === 'call' ? '전화' :
                                a.type === 'note' ? '메모' :
                                a.type === 'meeting' ? '미팅' : '이메일';
-              return `[${typeLabel}] ${a.title}: ${a.body?.substring(0, 200) || ''}`;
-            }).join('\n');
+              const dateStr = a.date || a.timestamp?.split('T')[0] || '날짜 미상';
+              const bodyText = a.body?.substring(0, 500) || '(내용 없음)';
+              return `[${dateStr}] ${typeLabel} - ${a.title}\n내용: ${bodyText}`;
+            }).join('\n\n');
 
-            const prompt = `다음은 "${entry.deal.name}" 거래와 관련된 최근 활동 내용입니다.
+            const prompt = `당신은 영업 활동을 정확하게 요약하는 비서입니다.
+주어진 활동 기록만을 바탕으로 사실에 기반한 요약을 작성하세요.
+절대로 날짜나 내용을 추측하거나 지어내지 마세요. 기록에 없는 정보는 언급하지 마세요.
+
+거래명: ${entry.deal.name}
 회사: ${entry.companyName || '(정보 없음)'}
 거래 단계: ${entry.deal.stageName}
 
-활동 내용:
+=== 활동 기록 (최신순) ===
 ${activityTexts}
+===
 
-위 활동들을 바탕으로 주요 진행 상황과 변동 사항을 3문장 이내로 간결하게 요약해주세요. 한국어로 작성하세요.`;
+위 활동 기록을 바탕으로 다음 형식으로 요약해주세요:
+1. 가장 최근 활동 날짜와 내용
+2. 주요 진행 상황 (실제 기록된 내용만)
+3. 다음 예상 단계 (기록에 언급된 경우에만)
+
+3문장 이내로 작성하세요. 한국어로 작성하세요.`;
 
             const response = await openai.chat.completions.create({
-              model: 'gpt-4o-mini',
-              messages: [{ role: 'user', content: prompt }],
-              max_tokens: 200,
-              temperature: 0.3
+              model: 'gpt-4o',
+              messages: [
+                {
+                  role: 'system',
+                  content: '당신은 정확한 정보만 전달하는 영업 비서입니다. 주어진 데이터에 없는 내용은 절대 추측하거나 생성하지 않습니다. 날짜와 사실관계를 정확히 기록된 대로만 전달합니다.'
+                },
+                { role: 'user', content: prompt }
+              ],
+              max_tokens: 300,
+              temperature: 0.1
             });
 
             return {
