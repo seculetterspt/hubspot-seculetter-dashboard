@@ -629,30 +629,34 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
 - 파트너사(예: 아이앤테크, 휴네시온)가 아닌 실제 고객사를 찾으세요
 - 찾을 수 없으면 "확인필요"
 
-## 활동별 요약 (중요: 아래 ${activityCount}개 활동을 각각 모두 요약하세요!)
+## 활동 요약 (${activityCount}건)
 오늘 날짜: ${today}
 
-=== 활동 기록 (총 ${activityCount}개) ===
+=== 활동 기록 ===
 ${activityTexts}
 ===
 
 ## 응답 형식:
 고객사: [추출한 고객사명]
 
-• [날짜] [활동유형]: [핵심 내용 요약]
-• [날짜] [활동유형]: [핵심 내용 요약]
-(위 ${activityCount}개 활동을 모두 각각 한 줄씩 요약하세요. 생략하지 마세요!)`;
+(1) [날짜] [활동유형]:
+[진행사항 요약 - 최대 3줄로 핵심 내용 정리]
+
+(2) [날짜] [활동유형]:
+[진행사항 요약 - 최대 3줄로 핵심 내용 정리]
+
+(활동 ${activityCount}건을 위 형식으로 각각 요약)`;
 
             const response = await openai.chat.completions.create({
               model: 'gpt-4o',
               messages: [
                 {
                   role: 'system',
-                  content: '영업 활동을 활동별로 요약합니다. 주어진 활동을 모두 각각 한 줄씩 요약하세요. 절대 활동을 생략하지 마세요.'
+                  content: '영업 활동을 활동별로 요약합니다. 각 활동에 번호를 매기고 최대 3줄로 핵심 내용을 정리하세요.'
                 },
                 { role: 'user', content: prompt }
               ],
-              max_tokens: 600,
+              max_tokens: 800,
               temperature: 0.1
             });
 
