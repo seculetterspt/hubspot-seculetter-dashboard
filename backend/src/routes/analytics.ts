@@ -604,6 +604,17 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
 
       // AI 요약 생성 (딜별) + 회사명 추출
       if (generateSummaries === 'true' && sortedDealActivities.length > 0) {
+        // 댓글 데이터 확인 로그
+        const activitiesWithComments = sortedDealActivities.flatMap(e => e.activities).filter(a => a.comments && a.comments.length > 0);
+        console.log(`[AI Summary] Activities with comments: ${activitiesWithComments.length}`);
+        if (activitiesWithComments.length > 0) {
+          console.log(`[AI Summary] Sample comments:`, activitiesWithComments.slice(0, 2).map(a => ({
+            type: a.type,
+            title: a.title,
+            commentsCount: a.comments?.length
+          })));
+        }
+
         const summaryPromises = sortedDealActivities.map(async (entry) => {
           try {
             // 활동 내용을 날짜와 함께 상세하게 포함 (댓글 포함)
