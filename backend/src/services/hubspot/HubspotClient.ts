@@ -191,13 +191,16 @@ export class HubspotClient {
           try {
             const deal = await this.client.crm.deals.basicApi.getById(dealId, ['dealname']);
             associations.deals.push({ id: dealId, name: deal.properties.dealname || '(거래명 없음)' });
-          } catch (e) {
-            // 거래 조회 실패 시 무시
+          } catch (e: any) {
+            console.error(`[Deal Assoc] Failed to get deal ${dealId}: ${e.message}`);
           }
         }
       }
-    } catch (e) {
-      // 연결 조회 실패 시 무시
+    } catch (e: any) {
+      // Rate limit 에러 로깅
+      if (e.code === 429) {
+        console.warn(`[Deal Assoc] Rate limit for ${objectType}/${activityId}`);
+      }
     }
 
     return associations;

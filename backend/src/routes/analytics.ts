@@ -389,12 +389,18 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           try {
             const assoc = await hubspotClient.getActivityAssociations(objectType, activity.id);
             activity.associations = assoc;
-          } catch (e) {
-            // 개별 association 조회 실패 시 무시
+          } catch (e: any) {
+            console.error(`[Association Error] ${objectType}/${activity.id}: ${e.message}`);
           }
         });
         await Promise.all(associationPromises);
       }
+      // 연결된 활동 통계 로그
+      const withDeals = activities.filter(a => a.associations.deals.length > 0);
+      const meetings = activities.filter(a => a.type === 'meeting');
+      const meetingsWithDeals = meetings.filter(m => m.associations.deals.length > 0);
+      console.log(`[Associations] Total: ${activities.length}, With deals: ${withDeals.length}`);
+      console.log(`[Associations] Meetings: ${meetings.length}, Meetings with deals: ${meetingsWithDeals.length}`);
     }
 
     // AI 요약 생성 (DB 캐싱 적용)
