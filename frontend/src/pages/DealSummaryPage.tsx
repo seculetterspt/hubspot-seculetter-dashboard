@@ -1,13 +1,32 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, ExternalLink, ChevronLeft, ChevronRight, TrendingUp, DollarSign, Target, Calendar, User, Sparkles, Building2, Phone, FileText, Mail } from 'lucide-react'
+import { RefreshCw, ExternalLink, ChevronLeft, ChevronRight, TrendingUp, DollarSign, Target, Calendar, User, Sparkles, Building2, Phone, FileText, Mail, ArrowUpRight } from 'lucide-react'
 import { analyticsApi } from '../services/api'
 
 // HubSpot Portal ID
 const HUBSPOT_PORTAL_ID = '243367573'
 
+// 파이프라인별 목표액 (원)
+const PIPELINE_TARGETS: Record<string, number> = {
+  'default': 1000000000, // New/Expansion: 10억
+  '173498896': 500000000, // Renewal: 5억 (실제 pipeline ID로 교체 필요)
+}
+
+// 파이프라인별 목표 표시명
+const PIPELINE_TARGET_LABELS: Record<string, string> = {
+  'default': '10억',
+  '173498896': '5억',
+}
+
 // HubSpot URL 생성 함수
 const getHubspotDealUrl = (dealId: string) => {
   return `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/deal/${dealId}`
+}
+
+interface DealChange {
+  type: 'stage' | 'amount'
+  previousValue: string
+  currentValue: string
+  changedAt: string
 }
 
 interface Deal {
@@ -21,6 +40,7 @@ interface Deal {
   ownerId: string | null
   ownerName: string
   probability: number
+  recentChanges?: DealChange[]
 }
 
 interface Stage {
@@ -82,6 +102,32 @@ interface DealRecentActivitiesData {
   deals: DealRecentActivity[]
 }
 
+// 딜 이름에서 실제 고객사 추출 (괄호 안 또는 첫 부분)
+const extractCustomerName = (dealName: string, partnerCompany?: string): string => {
+  // 괄호 안에 고객사가 있는 경우: "파트너사(고객사) - 제품"
+  const parenMatch = dealName.match(/\(([^)]+)\)/)
+  if (parenMatch) {
+    return parenMatch[1]
+  }
+
+  // 하이픈 앞이 회사명인 경우: "고객사 - 제품"
+  const hyphenParts = dealName.split(' - ')
+  if (hyphenParts.length > 1) {
+    const firstPart = hyphenParts[0].trim()
+    // 파트너사와 다르면 그게 고객사
+    if (partnerCompany && firstPart !== partnerCompany) {
+      return firstPart
+    }
+    // 파트너사가 없으면 첫 부분을 고객사로 사용
+    if (!partnerCompany) {
+      return firstPart
+    }
+  }
+
+  // 기본값: 연결된 회사명 또는 딜 이름의 첫 부분
+  return partnerCompany || dealName.split(' - ')[0] || dealName
+}
+
 // 금액 포맷 함수 (억/만원 단위)
 const formatAmount = (amount: number): string => {
   if (amount >= 100000000) {
@@ -118,6 +164,23 @@ const getStageHeaderColor = (probability: number): string => {
   if (probability < 80) return 'bg-indigo-100 text-indigo-800'
   if (probability < 100) return 'bg-purple-100 text-purple-800'
   return 'bg-green-100 text-green-800'
+}
+
+// 최근 변경 여부 확인 (7일 이내)
+const isRecentlyModified = (lastModified: string): boolean => {
+  if (!lastModified) return false
+  const modifiedDate = new Date(lastModified)
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  return modifiedDate >= sevenDaysAgo
+}
+
+// 목표 달성률 계산
+const getTargetProgress = (pipelineId: string, currentAmount: number): { target: number; progress: number; label: string } => {
+  const target = PIPELINE_TARGETS[pipelineId] || PIPELINE_TARGETS['default']
+  const label = PIPELINE_TARGET_LABELS[pipelineId] || PIPELINE_TARGET_LABELS['default']
+  const progress = Math.min((currentAmount / target) * 100, 100)
+  return { target, progress, label }
 }
 
 export default function DealSummaryPage() {
@@ -273,56 +336,87 @@ export default function DealSummaryPage() {
         </div>
       )}
 
-      {/* 요약 카드 */}
-      {currentPipeline && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
-              <DollarSign size={16} />
-              <span className="text-sm">총 거래 금액</span>
+      {/* 목표액 및 요약 카드 */}
+      {currentPipeline && (() => {
+        const targetInfo = getTargetProgress(currentPipeline.id, currentPipeline.totals.closedWonAmount)
+        return (
+          <>
+            {/* 목표 달성률 */}
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold opacity-90">목표 달성률</h3>
+                  <p className="text-3xl font-bold mt-1">
+                    {targetInfo.progress.toFixed(1)}%
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm opacity-75">목표</p>
+                  <p className="text-2xl font-bold">₩{targetInfo.label}</p>
+                </div>
+              </div>
+              <div className="w-full bg-white/20 rounded-full h-3">
+                <div
+                  className="bg-white rounded-full h-3 transition-all duration-500"
+                  style={{ width: `${targetInfo.progress}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-2 text-sm opacity-75">
+                <span>성사 금액: ₩{formatAmount(currentPipeline.totals.closedWonAmount)}</span>
+                <span>남은 금액: ₩{formatAmount(Math.max(0, targetInfo.target - currentPipeline.totals.closedWonAmount))}</span>
+              </div>
             </div>
-            <p className="text-2xl font-bold text-gray-900">
-              ₩{formatAmount(currentPipeline.totals.totalAmount)}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
-              <TrendingUp size={16} />
-              <span className="text-sm">가중치 적용 금액</span>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-2 text-gray-500 mb-1">
+                  <DollarSign size={16} />
+                  <span className="text-sm">총 거래 금액</span>
+                </div>
+                <p className="text-2xl font-bold text-gray-900">
+                  ₩{formatAmount(currentPipeline.totals.totalAmount)}
+                </p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-2 text-gray-500 mb-1">
+                  <TrendingUp size={16} />
+                  <span className="text-sm">가중치 적용 금액</span>
+                </div>
+                <p className="text-2xl font-bold text-blue-600">
+                  ₩{formatAmount(currentPipeline.totals.weightedAmount)}
+                </p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-2 text-gray-500 mb-1">
+                  <Target size={16} />
+                  <span className="text-sm">미결 거래 금액</span>
+                </div>
+                <p className="text-2xl font-bold text-orange-600">
+                  ₩{formatAmount(currentPipeline.totals.openAmount)}
+                </p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-2 text-gray-500 mb-1">
+                  <DollarSign size={16} className="text-green-500" />
+                  <span className="text-sm">성사된 거래 금액</span>
+                </div>
+                <p className="text-2xl font-bold text-green-600">
+                  ₩{formatAmount(currentPipeline.totals.closedWonAmount)}
+                </p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-2 text-gray-500 mb-1">
+                  <Calendar size={16} />
+                  <span className="text-sm">총 거래 수</span>
+                </div>
+                <p className="text-2xl font-bold text-gray-900">
+                  {currentPipeline.totals.totalCount}건
+                </p>
+              </div>
             </div>
-            <p className="text-2xl font-bold text-blue-600">
-              ₩{formatAmount(currentPipeline.totals.weightedAmount)}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
-              <Target size={16} />
-              <span className="text-sm">미결 거래 금액</span>
-            </div>
-            <p className="text-2xl font-bold text-orange-600">
-              ₩{formatAmount(currentPipeline.totals.openAmount)}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
-              <DollarSign size={16} className="text-green-500" />
-              <span className="text-sm">성사된 거래 금액</span>
-            </div>
-            <p className="text-2xl font-bold text-green-600">
-              ₩{formatAmount(currentPipeline.totals.closedWonAmount)}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
-              <Calendar size={16} />
-              <span className="text-sm">총 거래 수</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">
-              {currentPipeline.totals.totalCount}건
-            </p>
-          </div>
-        </div>
-      )}
+          </>
+        )
+      })()}
 
       {/* 칸반 보드 */}
       {currentPipeline && (
@@ -357,50 +451,91 @@ export default function DealSummaryPage() {
 
                 {/* 딜 목록 */}
                 <div className="p-2 space-y-2 max-h-[500px] overflow-y-auto">
-                  {stage.deals.map(deal => (
-                    <div
-                      key={deal.id}
-                      className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow-md transition-shadow"
-                    >
-                      {/* 딜 이름 */}
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <a
-                          href={getHubspotDealUrl(deal.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-gray-900 hover:text-blue-600 flex items-center gap-1 line-clamp-2"
-                        >
-                          {deal.name}
-                          <ExternalLink size={12} className="flex-shrink-0 text-gray-400" />
-                        </a>
-                      </div>
+                  {stage.deals.map(deal => {
+                    const recentlyModified = isRecentlyModified(deal.lastModified)
+                    const hasChanges = deal.recentChanges && deal.recentChanges.length > 0
 
-                      {/* 금액 */}
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-gray-500">금액</span>
-                        <span className="font-semibold text-gray-900">
-                          ₩{deal.amount ? formatAmount(deal.amount) : '-'}
-                        </span>
-                      </div>
+                    return (
+                      <div
+                        key={deal.id}
+                        className={`rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow ${
+                          recentlyModified
+                            ? 'bg-amber-50 border-2 border-amber-400 ring-2 ring-amber-200'
+                            : 'bg-white border border-gray-200'
+                        }`}
+                      >
+                        {/* 최근 변경 표시 */}
+                        {recentlyModified && (
+                          <div className="flex items-center gap-1 text-xs text-amber-700 bg-amber-100 rounded px-2 py-1 mb-2">
+                            <RefreshCw size={10} />
+                            <span>최근 업데이트: {formatDate(deal.lastModified)}</span>
+                          </div>
+                        )}
 
-                      {/* 예상 성사 날짜 */}
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-gray-500">거래 성사 날짜</span>
-                        <span className="text-gray-700">{formatDate(deal.closeDate)}</span>
-                      </div>
+                        {/* 변경 내역 표시 */}
+                        {hasChanges && deal.recentChanges!.map((change, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex items-center gap-1 text-xs rounded px-2 py-1 mb-2 ${
+                              change.type === 'stage'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-green-100 text-green-700'
+                            }`}
+                          >
+                            {change.type === 'stage' ? (
+                              <>
+                                <ArrowUpRight size={10} />
+                                <span>스테이지: {change.previousValue} → {change.currentValue}</span>
+                              </>
+                            ) : (
+                              <>
+                                <DollarSign size={10} />
+                                <span>금액: {change.previousValue} → {change.currentValue}</span>
+                              </>
+                            )}
+                          </div>
+                        ))}
 
-                      {/* 담당자 */}
-                      <div className="flex items-center gap-1 text-sm text-gray-500">
-                        <User size={12} />
-                        <span>{deal.ownerName}</span>
-                      </div>
+                        {/* 딜 이름 */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <a
+                            href={getHubspotDealUrl(deal.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-gray-900 hover:text-blue-600 flex items-center gap-1 line-clamp-2"
+                          >
+                            {deal.name}
+                            <ExternalLink size={12} className="flex-shrink-0 text-gray-400" />
+                          </a>
+                        </div>
 
-                      {/* 생성일 */}
-                      <div className="text-xs text-gray-400 mt-2">
-                        생성 날짜: {formatDate(deal.createDate)}
+                        {/* 금액 */}
+                        <div className="flex items-center justify-between text-sm mb-2">
+                          <span className="text-gray-500">금액</span>
+                          <span className="font-semibold text-gray-900">
+                            ₩{deal.amount ? formatAmount(deal.amount) : '-'}
+                          </span>
+                        </div>
+
+                        {/* 예상 성사 날짜 */}
+                        <div className="flex items-center justify-between text-sm mb-2">
+                          <span className="text-gray-500">거래 성사 날짜</span>
+                          <span className="text-gray-700">{formatDate(deal.closeDate)}</span>
+                        </div>
+
+                        {/* 담당자 */}
+                        <div className="flex items-center gap-1 text-sm text-gray-500">
+                          <User size={12} />
+                          <span>{deal.ownerName}</span>
+                        </div>
+
+                        {/* 생성일 */}
+                        <div className="text-xs text-gray-400 mt-2">
+                          생성 날짜: {formatDate(deal.createDate)}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
 
                   {stage.deals.length === 0 && (
                     <div className="text-center text-gray-400 py-8 text-sm">
@@ -456,7 +591,7 @@ export default function DealSummaryPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <Building2 size={16} className="text-blue-500" />
                         <span className="font-semibold text-gray-900 truncate">
-                          {deal.companyName || '(회사명 없음)'}
+                          {extractCustomerName(deal.dealName, deal.companyName)}
                         </span>
                       </div>
                       <a
@@ -507,7 +642,7 @@ export default function DealSummaryPage() {
                             <Sparkles size={12} />
                             <span className="font-medium">AI 요약</span>
                           </div>
-                          <p className="text-gray-800 text-sm leading-relaxed">{deal.aiSummary}</p>
+                          <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-line">{deal.aiSummary}</p>
                         </div>
                       ) : (
                         <div className="bg-gray-50 rounded-lg p-4 text-gray-500 text-sm">

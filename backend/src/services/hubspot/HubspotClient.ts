@@ -266,6 +266,22 @@ export class HubspotClient {
     }
   }
 
+  // 딜 속성 변경 이력 조회 (propertiesWithHistory 사용)
+  async getDealsWithHistory(limit = 100, after?: string) {
+    try {
+      const response = await this.client.crm.deals.basicApi.getPage(
+        limit,
+        after,
+        ['dealname', 'amount', 'dealstage', 'pipeline', 'closedate', 'createdate', 'hs_lastmodifieddate', 'hubspot_owner_id'],
+        ['dealstage', 'amount'] // propertiesWithHistory
+      );
+      return response;
+    } catch (error) {
+      console.error('Error fetching deals with history:', error);
+      throw error;
+    }
+  }
+
   async getTicketPipelines() {
     try {
       const response = await this.client.crm.pipelines.pipelinesApi.getAll('tickets');
