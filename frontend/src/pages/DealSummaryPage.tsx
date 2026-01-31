@@ -550,87 +550,85 @@ export default function DealSummaryPage() {
           </div>
 
           {recentActivities && recentActivities.deals.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {recentActivities.deals.map(deal => (
                 <div
                   key={deal.dealId}
-                  className="flex gap-6 border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
                 >
-                  {/* 왼쪽: 딜 정보 */}
-                  <div className="flex-1 min-w-0">
-                    {/* 회사명 & 딜명 */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <Building2 size={18} className="text-blue-500 flex-shrink-0" />
-                      <span className="font-semibold text-gray-900">
-                        {deal.companyName || '(회사명 추출 중)'}
-                      </span>
-                    </div>
-                    <a
-                      href={getHubspotDealUrl(deal.dealId)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline inline-flex items-center gap-1 mb-2"
-                    >
-                      {deal.dealName}
-                      <ExternalLink size={12} />
-                    </a>
-
-                    {/* 스테이지 & 금액 */}
-                    <div className="flex items-center gap-3 text-sm mb-3">
-                      <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-700">
-                        {deal.stageName}
-                      </span>
-                      {deal.amount > 0 && (
-                        <span className="font-medium text-gray-900">
-                          ₩{formatAmount(deal.amount)}
+                  <div className="flex items-start gap-4">
+                    {/* 회사/딜 정보 */}
+                    <div className="flex-shrink-0 w-48">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Building2 size={16} className="text-blue-500" />
+                        <span className="font-semibold text-gray-900 truncate">
+                          {deal.companyName || '(회사명 추출 중)'}
                         </span>
-                      )}
+                      </div>
+                      <a
+                        href={getHubspotDealUrl(deal.dealId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        {deal.dealName}
+                        <ExternalLink size={12} />
+                      </a>
+                      <div className="mt-2 text-xs text-gray-500">
+                        <span className="inline-block bg-gray-100 px-2 py-0.5 rounded mr-2">
+                          {deal.stageName}
+                        </span>
+                        {deal.amount > 0 && (
+                          <span className="text-gray-700 font-medium">
+                            ₩{formatAmount(deal.amount)}
+                          </span>
+                        )}
+                      </div>
+                      {/* 최근 활동 아이콘들 */}
+                      <div className="flex items-center gap-2 mt-2">
+                        {deal.activities.map((activity, idx) => {
+                          const Icon = activity.type === 'call' ? Phone :
+                                      activity.type === 'meeting' ? Calendar :
+                                      activity.type === 'email' ? Mail : FileText
+                          const color = activity.type === 'call' ? 'text-blue-500' :
+                                       activity.type === 'meeting' ? 'text-purple-500' :
+                                       activity.type === 'email' ? 'text-orange-500' : 'text-green-500'
+                          return (
+                            <div key={idx} className={`${color}`} title={`${activity.title} (${activity.date})`}>
+                              <Icon size={14} />
+                            </div>
+                          )
+                        })}
+                        {deal.activityCount > deal.activities.length && (
+                          <span className="text-xs text-gray-400">+{deal.activityCount - deal.activities.length}</span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* 활동 아이콘 목록 */}
-                    <div className="flex flex-wrap gap-2">
-                      {deal.activities.map((activity, idx) => {
-                        const Icon = activity.type === 'call' ? Phone :
-                                    activity.type === 'meeting' ? Calendar :
-                                    activity.type === 'email' ? Mail : FileText
-                        const bgColor = activity.type === 'call' ? 'bg-blue-100 text-blue-600' :
-                                       activity.type === 'meeting' ? 'bg-purple-100 text-purple-600' :
-                                       activity.type === 'email' ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
-
-                        return (
-                          <div
-                            key={idx}
-                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${bgColor}`}
-                            title={`${activity.title} (${activity.date})`}
-                          >
-                            <Icon size={12} />
-                            <span className="max-w-[120px] truncate">{activity.title}</span>
+                    {/* AI 요약 */}
+                    <div className="flex-1">
+                      {deal.aiSummary ? (
+                        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-100">
+                          <div className="flex items-center gap-1 text-xs text-purple-600 mb-2">
+                            <Sparkles size={12} />
+                            <span className="font-medium">AI 요약</span>
                           </div>
-                        )
-                      })}
-                      {deal.activityCount > deal.activities.length && (
-                        <span className="text-xs text-gray-400 px-2 py-1">
-                          +{deal.activityCount - deal.activities.length}
-                        </span>
+                          <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-line">{deal.aiSummary}</p>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 rounded-lg p-4 text-gray-500 text-sm">
+                          요약 생성 중...
+                        </div>
                       )}
                     </div>
-                  </div>
 
-                  {/* 오른쪽: AI 요약 */}
-                  <div className="flex-1 min-w-0">
-                    {deal.aiSummary ? (
-                      <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-100 h-full">
-                        <div className="flex items-center gap-1 text-xs text-purple-600 mb-2">
-                          <Sparkles size={12} />
-                          <span className="font-medium">AI 요약</span>
-                        </div>
-                        <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-line">{deal.aiSummary}</p>
+                    {/* 날짜 */}
+                    <div className="flex-shrink-0 text-right text-xs text-gray-400">
+                      <div>최근 활동</div>
+                      <div className="font-medium text-gray-600">
+                        {formatDate(deal.latestActivityDate)}
                       </div>
-                    ) : (
-                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 h-full flex items-center justify-center">
-                        <span className="text-gray-400 text-sm">요약 없음</span>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               ))}
