@@ -6,7 +6,7 @@ const baseURL = import.meta.env.PROD
 
 export const api = axios.create({
   baseURL,
-  timeout: 10000,
+  timeout: 120000, // 2분 타임아웃 (딜 그룹화 + AI 요약 생성 시간 고려)
   headers: {
     'Content-Type': 'application/json',
   },
