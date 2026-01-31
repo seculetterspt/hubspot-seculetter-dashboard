@@ -5,21 +5,19 @@ import { analyticsApi } from '../services/api'
 // HubSpot Portal ID
 const HUBSPOT_PORTAL_ID = '243367573'
 
-// 파이프라인별 목표액 (원)
-const PIPELINE_TARGETS: Record<string, number> = {
-  'default': 1000000000, // New/Expansion: 10억
-  '173498896': 500000000, // Renewal: 5억 (실제 pipeline ID로 교체 필요)
-}
-
-// 파이프라인별 목표 표시명
-const PIPELINE_TARGET_LABELS: Record<string, string> = {
-  'default': '10억',
-  '173498896': '5억',
-}
-
 // HubSpot URL 생성 함수
 const getHubspotDealUrl = (dealId: string) => {
   return `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/deal/${dealId}`
+}
+
+// 목표 달성률 계산 (파이프라인 라벨 기반)
+const getTargetProgress = (pipelineLabel: string, currentAmount: number): { target: number; progress: number; label: string } => {
+  // 파이프라인 라벨에 "Renewal"이 포함되면 5억, 아니면 10억
+  const isRenewal = pipelineLabel.toLowerCase().includes('renewal')
+  const target = isRenewal ? 500000000 : 1000000000
+  const label = isRenewal ? '5억' : '10억'
+  const progress = Math.min((currentAmount / target) * 100, 100)
+  return { target, progress, label }
 }
 
 interface DealChange {
@@ -102,32 +100,6 @@ interface DealRecentActivitiesData {
   deals: DealRecentActivity[]
 }
 
-// 딜 이름에서 실제 고객사 추출 (괄호 안 또는 첫 부분)
-const extractCustomerName = (dealName: string, partnerCompany?: string): string => {
-  // 괄호 안에 고객사가 있는 경우: "파트너사(고객사) - 제품"
-  const parenMatch = dealName.match(/\(([^)]+)\)/)
-  if (parenMatch) {
-    return parenMatch[1]
-  }
-
-  // 하이픈 앞이 회사명인 경우: "고객사 - 제품"
-  const hyphenParts = dealName.split(' - ')
-  if (hyphenParts.length > 1) {
-    const firstPart = hyphenParts[0].trim()
-    // 파트너사와 다르면 그게 고객사
-    if (partnerCompany && firstPart !== partnerCompany) {
-      return firstPart
-    }
-    // 파트너사가 없으면 첫 부분을 고객사로 사용
-    if (!partnerCompany) {
-      return firstPart
-    }
-  }
-
-  // 기본값: 연결된 회사명 또는 딜 이름의 첫 부분
-  return partnerCompany || dealName.split(' - ')[0] || dealName
-}
-
 // 금액 포맷 함수 (억/만원 단위)
 const formatAmount = (amount: number): string => {
   if (amount >= 100000000) {
@@ -173,14 +145,6 @@ const isRecentlyModified = (lastModified: string): boolean => {
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   return modifiedDate >= sevenDaysAgo
-}
-
-// 목표 달성률 계산
-const getTargetProgress = (pipelineId: string, currentAmount: number): { target: number; progress: number; label: string } => {
-  const target = PIPELINE_TARGETS[pipelineId] || PIPELINE_TARGETS['default']
-  const label = PIPELINE_TARGET_LABELS[pipelineId] || PIPELINE_TARGET_LABELS['default']
-  const progress = Math.min((currentAmount / target) * 100, 100)
-  return { target, progress, label }
 }
 
 export default function DealSummaryPage() {
@@ -338,7 +302,7 @@ export default function DealSummaryPage() {
 
       {/* 목표액 및 요약 카드 */}
       {currentPipeline && (() => {
-        const targetInfo = getTargetProgress(currentPipeline.id, currentPipeline.totals.closedWonAmount)
+        const targetInfo = getTargetProgress(currentPipeline.label, currentPipeline.totals.closedWonAmount)
         return (
           <>
             {/* 목표 달성률 */}
@@ -591,7 +555,7 @@ export default function DealSummaryPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <Building2 size={16} className="text-blue-500" />
                         <span className="font-semibold text-gray-900 truncate">
-                          {extractCustomerName(deal.dealName, deal.companyName)}
+                          {deal.companyName || '(회사명 추출 중)'}
                         </span>
                       </div>
                       <a
