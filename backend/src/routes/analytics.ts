@@ -338,11 +338,18 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
         const timestamp = meeting.properties.hs_meeting_start_time || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
 
+        // 미팅 본문과 내부 노트를 합침
+        const meetingBody = meeting.properties.hs_meeting_body || '';
+        const internalNotes = meeting.properties.hs_internal_meeting_notes || '';
+        const combinedBody = internalNotes
+          ? `${meetingBody}\n\n[내부 노트]\n${internalNotes}`
+          : meetingBody;
+
         activities.push({
           id: meeting.id,
           type: 'meeting',
           title: meeting.properties.hs_meeting_title || '(제목 없음)',
-          body: meeting.properties.hs_meeting_body || '',
+          body: combinedBody || '',
           timestamp,
           date,
           associations: emptyAssociations,
