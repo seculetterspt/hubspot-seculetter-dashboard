@@ -183,13 +183,19 @@ router.get('/deal-summary', async (req: Request, res: Response) => {
       });
 
       // 파이프라인 합계 계산
+      // "거래 완료", "성사", "won" 등의 라벨을 가진 스테이지를 성사된 거래로 인식
+      const isClosedWonStage = (stageLabel: string): boolean => {
+        const label = stageLabel.toLowerCase();
+        return label.includes('완료') || label.includes('성사') || label.includes('won') || label.includes('closed');
+      };
+
       const pipelineTotals = stages.reduce(
         (acc, stage) => ({
           totalAmount: acc.totalAmount + stage.totalAmount,
           weightedAmount: acc.weightedAmount + stage.weightedAmount,
           totalCount: acc.totalCount + stage.count,
-          closedWonAmount: stage.probability === 100 ? acc.closedWonAmount + stage.totalAmount : acc.closedWonAmount,
-          openAmount: stage.probability < 100 && stage.probability > 0 ? acc.openAmount + stage.totalAmount : acc.openAmount
+          closedWonAmount: isClosedWonStage(stage.label) ? acc.closedWonAmount + stage.totalAmount : acc.closedWonAmount,
+          openAmount: !isClosedWonStage(stage.label) && stage.probability > 0 ? acc.openAmount + stage.totalAmount : acc.openAmount
         }),
         { totalAmount: 0, weightedAmount: 0, totalCount: 0, closedWonAmount: 0, openAmount: 0 }
       );
@@ -681,7 +687,7 @@ ${activityTexts}
             activityCount: entry.activities.length,
             latestActivityDate: entry.latestActivityDate,
             aiSummary: aiResult?.summary || '',
-            activities: entry.activities.slice(0, 3).map(a => ({
+            activities: entry.activities.slice(0, 5).map(a => ({
               type: a.type,
               title: a.title,
               date: a.date
@@ -698,7 +704,7 @@ ${activityTexts}
           activityCount: entry.activities.length,
           latestActivityDate: entry.latestActivityDate,
           aiSummary: '',
-          activities: entry.activities.slice(0, 3).map(a => ({
+          activities: entry.activities.slice(0, 5).map(a => ({
             type: a.type,
             title: a.title,
             date: a.date
