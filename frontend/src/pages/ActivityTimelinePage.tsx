@@ -32,6 +32,21 @@ const getKSTDateRange = () => {
   }
 }
 
+// 범위 내 모든 날짜 생성
+const generateAllDatesInRange = (from: string, to: string): string[] => {
+  const dates: string[] = []
+  const startDate = new Date(from)
+  const endDate = new Date(to)
+
+  const current = new Date(startDate)
+  while (current <= endDate) {
+    dates.push(current.toISOString().split('T')[0])
+    current.setDate(current.getDate() + 1)
+  }
+
+  return dates
+}
+
 interface Association {
   id: string
   name: string
@@ -88,19 +103,8 @@ export default function ActivityTimelinePage() {
       const res = await api.get(url)
       setData(res.data)
 
-      // 오늘 날짜가 있으면 선택, 없으면 가장 가까운 날짜 선택
-      if (res.data.dates.length > 0) {
-        if (res.data.dates.includes(today)) {
-          setSelectedDate(today)
-        } else {
-          const sorted = [...res.data.dates].sort((a, b) => {
-            const diffA = Math.abs(new Date(a).getTime() - new Date(today).getTime())
-            const diffB = Math.abs(new Date(b).getTime() - new Date(today).getTime())
-            return diffA - diffB
-          })
-          setSelectedDate(sorted[0])
-        }
-      }
+      // 오늘 날짜 선택
+      setSelectedDate(today)
     } catch (error) {
       console.error('Error:', error)
     } finally {
@@ -196,10 +200,36 @@ export default function ActivityTimelinePage() {
   }
 
   const isDateInFuture = (dateStr: string) => {
-    return new Date(dateStr) > new Date(today)
+    return dateStr > today
   }
 
+  // 범위 내 모든 날짜
+  const allDates = generateAllDatesInRange(dateRange.from, dateRange.to)
+
   const selectedActivities = selectedDate && data?.activitiesByDate[selectedDate] || []
+
+  // 날짜 색상 결정
+  const getDateStyle = (dateStr: string, isSelected: boolean) => {
+    const isToday = dateStr === today
+    const isFuture = isDateInFuture(dateStr)
+    const hasActivity = (data?.activitiesByDate[dateStr]?.length || 0) > 0
+
+    if (isSelected) {
+      return 'bg-primary-100 border-primary-400 ring-2 ring-primary-200'
+    }
+    if (isToday) {
+      return 'bg-blue-50 border-blue-300 hover:bg-blue-100'
+    }
+    if (isFuture) {
+      return hasActivity
+        ? 'bg-purple-50 border-purple-200 hover:bg-purple-100'
+        : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+    }
+    // Past
+    return hasActivity
+      ? 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+      : 'bg-gray-50/50 border-gray-100 hover:bg-gray-100/50'
+  }
 
   if (loading) {
     return (
@@ -236,10 +266,10 @@ export default function ActivityTimelinePage() {
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h2 className="font-semibold text-gray-900 mb-4">날짜별 활동</h2>
-            <div className="space-y-2 max-h-[600px] overflow-y-auto">
-              {data?.dates.map(dateStr => {
+            <div className="space-y-1 max-h-[600px] overflow-y-auto">
+              {allDates.map(dateStr => {
                 const { month, day, dayName } = formatDate(dateStr)
-                const count = data.activitiesByDate[dateStr]?.length || 0
+                const count = data?.activitiesByDate[dateStr]?.length || 0
                 const isSelected = selectedDate === dateStr
                 const isFuture = isDateInFuture(dateStr)
                 const isToday = dateStr === today
@@ -248,39 +278,46 @@ export default function ActivityTimelinePage() {
                   <button
                     key={dateStr}
                     onClick={() => setSelectedDate(dateStr)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all ${
-                      isSelected
-                        ? 'bg-primary-50 border-primary-300 ring-2 ring-primary-200'
-                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                    }`}
+                    className={`w-full text-left p-2.5 rounded-lg border transition-all ${getDateStyle(dateStr, isSelected)}`}
                   >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <span className={`text-lg font-bold ${isSelected ? 'text-primary-700' : 'text-gray-900'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-base font-bold ${
+                          isSelected ? 'text-primary-700' :
+                          isToday ? 'text-blue-700' :
+                          isFuture ? 'text-purple-700' :
+                          count > 0 ? 'text-gray-900' : 'text-gray-400'
+                        }`}>
                           {month}/{day}
                         </span>
-                        <span className={`ml-2 text-sm ${isSelected ? 'text-primary-600' : 'text-gray-500'}`}>
+                        <span className={`text-sm ${
+                          isSelected ? 'text-primary-600' :
+                          isToday ? 'text-blue-600' :
+                          isFuture ? 'text-purple-500' :
+                          count > 0 ? 'text-gray-500' : 'text-gray-400'
+                        }`}>
                           ({dayName})
                         </span>
                         {isToday && (
-                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">오늘</span>
-                        )}
-                        {isFuture && !isToday && (
-                          <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">예정</span>
+                          <span className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded font-medium">오늘</span>
                         )}
                       </div>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        isSelected ? 'bg-primary-200 text-primary-800' : 'bg-gray-200 text-gray-700'
-                      }`}>
-                        {count}건
-                      </span>
+                      {count > 0 ? (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          isSelected ? 'bg-primary-200 text-primary-800' :
+                          isToday ? 'bg-blue-200 text-blue-800' :
+                          isFuture ? 'bg-purple-200 text-purple-800' :
+                          'bg-gray-200 text-gray-700'
+                        }`}>
+                          {count}건
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">-</span>
+                      )}
                     </div>
                   </button>
                 )
               })}
-              {(!data?.dates || data.dates.length === 0) && (
-                <p className="text-center text-gray-500 py-8">활동이 없습니다</p>
-              )}
             </div>
           </div>
         </div>

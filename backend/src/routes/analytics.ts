@@ -422,6 +422,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           companyName: a.associations.companies[0]?.name,
           contactName: a.associations.contacts[0]?.name,
           dealName: a.associations.deals[0]?.name,
+          comments: a.comments?.map(c => ({ body: c.body, timestamp: c.timestamp })),
         }));
 
         // DB에서 기존 요약 조회 후 없는 것만 새로 생성하고 저장

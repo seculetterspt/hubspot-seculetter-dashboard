@@ -14,6 +14,11 @@ interface Activity {
   };
 }
 
+interface ActivityComment {
+  body: string;
+  timestamp: string;
+}
+
 interface ActivityWithContext {
   id: string;
   type: 'call' | 'note' | 'meeting' | 'email';
@@ -24,6 +29,7 @@ interface ActivityWithContext {
   companyName?: string;
   contactName?: string;
   dealName?: string;
+  comments?: ActivityComment[]; // 활동에 달린 댓글
 }
 
 interface ActivitySummary {
@@ -210,6 +216,13 @@ ${activitiesForPrompt}
       if (a.dealName) lines.push(`거래: ${a.dealName}`);
       if (a.title) lines.push(`제목: ${a.title}`);
       if (a.body) lines.push(`내용: ${a.body.substring(0, 500)}`);
+      // 댓글 추가 (중요한 후속 정보가 담겨있을 수 있음)
+      if (a.comments && a.comments.length > 0) {
+        lines.push(`\n[댓글/후속 기록]:`);
+        a.comments.forEach((comment, idx) => {
+          lines.push(`  - ${comment.body.substring(0, 300)}`);
+        });
+      }
       return lines.join('\n');
     }).join('\n\n---\n\n');
 
@@ -221,6 +234,7 @@ ${activitiesForPrompt}
 2. 논의된 주요 내용 요약
 3. 후속 조치가 필요한 사항 포함
 4. 비즈니스 맥락에서 중요한 정보 강조
+5. **[댓글/후속 기록]이 있으면 반드시 반영** - 일정 변경, 연기, 추가 조치 등 중요한 정보가 포함되어 있음
 
 ## 활동 목록:
 ${activitiesForPrompt}
