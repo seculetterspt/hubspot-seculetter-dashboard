@@ -373,15 +373,34 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
     if (groupByDeals === 'true') {
       const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
 
-      // 딜 정보 조회
+      // Rate Limit 방지를 위한 대기
+      await delay(1000);
+
+      // 딜 정보 조회 (재시도 로직 포함)
       let allDeals: any[] = [];
       let after: string | undefined = undefined;
+      let retryCount = 0;
+      const maxRetries = 3;
+
       do {
-        const dealsRes = await hubspotClient.getDeals(100, after);
-        allDeals = allDeals.concat(dealsRes.results);
-        after = dealsRes.paging?.next?.after;
-        if (after) await delay(300);
+        try {
+          const dealsRes = await hubspotClient.getDeals(100, after);
+          allDeals = allDeals.concat(dealsRes.results);
+          after = dealsRes.paging?.next?.after;
+          retryCount = 0; // 성공하면 재시도 카운트 리셋
+        } catch (e: any) {
+          if (e.code === 429 && retryCount < maxRetries) {
+            retryCount++;
+            console.log(`[Deal Grouping] Rate limit hit, waiting ${retryCount * 2}s before retry...`);
+            await delay(retryCount * 2000);
+            continue;
+          }
+          throw e;
+        }
+        if (after) await delay(500);
       } while (after);
+
+      await delay(500);
 
       // 파이프라인 정보 조회
       const pipelines = await hubspotClient.getDealPipelines();
