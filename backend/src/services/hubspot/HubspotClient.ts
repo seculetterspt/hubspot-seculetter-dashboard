@@ -220,6 +220,8 @@ export class HubspotClient {
         50
       );
 
+      console.log(`[Notes] ${objectType}/${activityId}: found ${noteAssoc.results.length} notes`);
+
       if (noteAssoc.results.length > 0) {
         const noteIds = noteAssoc.results.map(r => r.toObjectId);
         for (const noteId of noteIds) {
@@ -234,13 +236,16 @@ export class HubspotClient {
               body: note.properties.hs_note_body || '',
               timestamp: note.properties.hs_timestamp || ''
             });
-          } catch (e) {
-            // 노트 조회 실패 시 무시
+          } catch (e: any) {
+            console.error(`[Notes] Failed to get note ${noteId}: ${e.message}`);
           }
         }
       }
-    } catch (e) {
-      // 연결 조회 실패 시 무시 (notes 연결이 없을 수 있음)
+    } catch (e: any) {
+      // 연결 조회 실패 로그
+      if (e.code !== 404) {
+        console.error(`[Notes] ${objectType}/${activityId} association error: ${e.message}`);
+      }
     }
 
     // 시간순 정렬 (최신순)
