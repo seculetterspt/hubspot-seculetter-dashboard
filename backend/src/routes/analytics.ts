@@ -22,12 +22,12 @@ router.get('/deal-summary', async (req: Request, res: Response) => {
     // 파이프라인 정보 조회
     const pipelines = await hubspotClient.getDealPipelines();
 
-    // 모든 딜 조회 (페이지네이션 처리, 변경 이력 포함)
+    // 모든 딜 조회 (페이지네이션 처리, 변경 이력 포함 - 최대 50개씩)
     let allDeals: any[] = [];
     let after: string | undefined = undefined;
 
     do {
-      const dealsResponse = await hubspotClient.getDealsWithHistory(100, after);
+      const dealsResponse = await hubspotClient.getDealsWithHistory(50, after);
       allDeals = allDeals.concat(dealsResponse.results);
       after = dealsResponse.paging?.next?.after;
     } while (after);

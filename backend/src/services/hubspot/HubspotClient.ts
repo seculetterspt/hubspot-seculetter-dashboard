@@ -266,11 +266,11 @@ export class HubspotClient {
     }
   }
 
-  // 딜 속성 변경 이력 조회 (propertiesWithHistory 사용)
-  async getDealsWithHistory(limit = 100, after?: string) {
+  // 딜 속성 변경 이력 조회 (propertiesWithHistory 사용 - 최대 50개 제한)
+  async getDealsWithHistory(limit = 50, after?: string) {
     try {
       const response = await this.client.crm.deals.basicApi.getPage(
-        limit,
+        Math.min(limit, 50), // HubSpot API 제한: propertiesWithHistory 사용 시 최대 50개
         after,
         ['dealname', 'amount', 'dealstage', 'pipeline', 'closedate', 'createdate', 'hs_lastmodifieddate', 'hubspot_owner_id'],
         ['dealstage', 'amount'] // propertiesWithHistory
