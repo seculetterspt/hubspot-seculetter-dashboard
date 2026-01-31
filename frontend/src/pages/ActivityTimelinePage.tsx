@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { RefreshCw, Phone, FileText, Calendar, Mail, Sparkles, Building2, User, Briefcase, ExternalLink, MessageSquare } from 'lucide-react'
 import { api } from '../services/api'
 
@@ -8,6 +8,28 @@ const HUBSPOT_PORTAL_ID = '243367573'
 // HubSpot URL 생성 함수
 const getHubspotUrl = (type: 'company' | 'contact' | 'deal', id: string) => {
   return `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/${type}/${id}`
+}
+
+// KST 기준 오늘 날짜 (YYYY-MM-DD)
+const getKSTToday = () => {
+  const now = new Date()
+  // UTC + 9시간 = KST
+  const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+  return kst.toISOString().split('T')[0]
+}
+
+// KST 기준 날짜 범위 (앞뒤 2주)
+const getKSTDateRange = () => {
+  const now = new Date()
+  const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+
+  const from = new Date(kstNow.getTime() - (14 * 24 * 60 * 60 * 1000))
+  const to = new Date(kstNow.getTime() + (14 * 24 * 60 * 60 * 1000))
+
+  return {
+    from: from.toISOString().split('T')[0],
+    to: to.toISOString().split('T')[0]
+  }
 }
 
 interface Association {
@@ -54,21 +76,9 @@ export default function ActivityTimelinePage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const loadedDatesRef = useRef<Set<string>>(new Set())
 
-  // 현재 날짜 기준 2주 전/후
-  const today = useMemo(() => {
-    const d = new Date()
-    return d.toISOString().split('T')[0]
-  }, [])
-
-  const dateRange = useMemo(() => {
-    const now = new Date()
-    const from = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000))
-    const to = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000))
-    return {
-      from: from.toISOString().split('T')[0],
-      to: to.toISOString().split('T')[0]
-    }
-  }, [])
+  // KST 기준 오늘 날짜와 날짜 범위 (매 렌더링마다 최신 값 사용)
+  const today = getKSTToday()
+  const dateRange = getKSTDateRange()
 
   // 초기 로딩 (association 없이 빠르게)
   const fetchData = async () => {
