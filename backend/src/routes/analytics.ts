@@ -22,15 +22,23 @@ router.get('/deal-summary', async (req: Request, res: Response) => {
     // 파이프라인 정보 조회
     const pipelines = await hubspotClient.getDealPipelines();
 
-    // 모든 딜 조회 (페이지네이션 처리)
+    // 모든 딜 조회 (페이지네이션 처리, 변경 이력 포함)
     let allDeals: any[] = [];
     let after: string | undefined = undefined;
 
     do {
-      const dealsResponse = await hubspotClient.getDeals(100, after);
+      const dealsResponse = await hubspotClient.getDealsWithHistory(100, after);
       allDeals = allDeals.concat(dealsResponse.results);
       after = dealsResponse.paging?.next?.after;
     } while (after);
+
+    // 스테이지 라벨 매핑을 위해 모든 파이프라인 스테이지 수집
+    const allStageLabels = new Map<string, string>();
+    pipelines.results.forEach((p: any) => {
+      p.stages.forEach((s: any) => {
+        allStageLabels.set(s.id, s.label);
+      });
+    });
 
     // Owner 정보 조회
     const ownersResponse = await hubspotClient.getOwners();
@@ -81,6 +89,65 @@ router.get('/deal-summary', async (req: Request, res: Response) => {
           const amount = parseFloat(deal.properties.amount) || 0;
           const probability = stage.probability / 100;
 
+          // 최근 7일 이내 변경 이력 추출
+          const recentChanges: Array<{
+            type: 'stage' | 'amount';
+            previousValue: string;
+            currentValue: string;
+            changedAt: string;
+          }> = [];
+
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+          // 스테이지 변경 이력
+          if (deal.propertiesWithHistory?.dealstage) {
+            const stageHistory = deal.propertiesWithHistory.dealstage;
+            if (stageHistory.length > 1) {
+              const currentStage = stageHistory[0];
+              const previousStage = stageHistory[1];
+              const changedAt = new Date(currentStage.timestamp);
+
+              if (changedAt >= sevenDaysAgo) {
+                recentChanges.push({
+                  type: 'stage',
+                  previousValue: allStageLabels.get(previousStage.value) || previousStage.value,
+                  currentValue: allStageLabels.get(currentStage.value) || currentStage.value,
+                  changedAt: currentStage.timestamp
+                });
+              }
+            }
+          }
+
+          // 금액 변경 이력
+          if (deal.propertiesWithHistory?.amount) {
+            const amountHistory = deal.propertiesWithHistory.amount;
+            if (amountHistory.length > 1) {
+              const currentAmount = amountHistory[0];
+              const previousAmount = amountHistory[1];
+              const changedAt = new Date(currentAmount.timestamp);
+
+              if (changedAt >= sevenDaysAgo && currentAmount.value !== previousAmount.value) {
+                const prevVal = parseFloat(previousAmount.value) || 0;
+                const currVal = parseFloat(currentAmount.value) || 0;
+                recentChanges.push({
+                  type: 'amount',
+                  previousValue: prevVal >= 100000000
+                    ? `${(prevVal / 100000000).toFixed(2)}억`
+                    : prevVal >= 10000
+                      ? `${(prevVal / 10000).toFixed(0)}만`
+                      : `${prevVal.toLocaleString()}원`,
+                  currentValue: currVal >= 100000000
+                    ? `${(currVal / 100000000).toFixed(2)}억`
+                    : currVal >= 10000
+                      ? `${(currVal / 10000).toFixed(0)}만`
+                      : `${currVal.toLocaleString()}원`,
+                  changedAt: currentAmount.timestamp
+                });
+              }
+            }
+          }
+
           // Association 정보 조회를 위한 데이터 준비
           const dealData = {
             id: deal.id,
@@ -94,7 +161,8 @@ router.get('/deal-summary', async (req: Request, res: Response) => {
             ownerName: deal.properties.hubspot_owner_id
               ? ownersMap.get(deal.properties.hubspot_owner_id) || '(담당자 없음)'
               : '(담당자 없음)',
-            probability: stage.probability
+            probability: stage.probability,
+            recentChanges: recentChanges.length > 0 ? recentChanges : undefined
           };
 
           stage.deals.push(dealData);
@@ -510,9 +578,14 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
               return `[${dateStr}] ${typeLabel} - ${a.title}\n내용: ${bodyText}`;
             }).join('\n\n');
 
+            const today = new Date().toISOString().split('T')[0];
             const prompt = `당신은 영업 활동을 정확하게 요약하는 비서입니다.
 주어진 활동 기록만을 바탕으로 사실에 기반한 요약을 작성하세요.
 절대로 날짜나 내용을 추측하거나 지어내지 마세요. 기록에 없는 정보는 언급하지 마세요.
+
+오늘 날짜: ${today}
+중요: 오늘 이후의 날짜는 "예정"으로 표현하세요. (예: "2월 5일 미팅 예정", "다음 주 통화 예정")
+오늘 이전의 날짜는 과거형으로 표현하세요. (예: "1월 30일 미팅이 진행됨")
 
 거래명: ${entry.deal.name}
 회사: ${entry.companyName || '(정보 없음)'}
@@ -524,7 +597,7 @@ ${activityTexts}
 
 위 활동 기록을 바탕으로 다음 형식으로 요약해주세요. 각 항목은 반드시 줄바꿈으로 구분하세요:
 
-• 최근 활동: [날짜] - [구체적인 활동 내용]
+• 최근/예정 활동: [날짜] - [활동 내용] (미래 날짜면 "예정"으로 표시)
 • 진행 상황: [실제 기록에 있는 내용만 작성]
 • 다음 단계: [기록에 언급된 경우에만 작성, 없으면 이 줄 생략]
 
