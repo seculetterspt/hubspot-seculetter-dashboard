@@ -606,14 +606,23 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       if (generateSummaries === 'true' && sortedDealActivities.length > 0) {
         const summaryPromises = sortedDealActivities.map(async (entry) => {
           try {
-            // 활동 내용을 날짜와 함께 상세하게 포함
+            // 활동 내용을 날짜와 함께 상세하게 포함 (댓글 포함)
             const activityTexts = entry.activities.slice(0, 10).map(a => {
               const typeLabel = a.type === 'call' ? '전화' :
                                a.type === 'note' ? '메모' :
                                a.type === 'meeting' ? '미팅' : '이메일';
               const dateStr = a.date || a.timestamp?.split('T')[0] || '날짜 미상';
               const bodyText = a.body?.substring(0, 500) || '(내용 없음)';
-              return `[${dateStr}] ${typeLabel} - ${a.title}\n내용: ${bodyText}`;
+
+              // 댓글(노트) 내용 추가
+              let commentsText = '';
+              if (a.comments && a.comments.length > 0) {
+                commentsText = '\n[댓글]\n' + a.comments.map((c: any) =>
+                  `- ${c.body?.substring(0, 200) || ''}`
+                ).join('\n');
+              }
+
+              return `[${dateStr}] ${typeLabel} - ${a.title}\n내용: ${bodyText}${commentsText}`;
             }).join('\n\n');
 
             const today = new Date().toISOString().split('T')[0];
@@ -632,7 +641,8 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
 
 ## 활동 요약 (${activityCount}건)
 오늘 날짜: ${today}
-중요: 날짜가 오늘(${today}) 이후면 "[활동유형] 예정"으로 표시하세요!
+- 날짜가 오늘(${today}) 이후면 "[활동유형] 예정"으로 표시
+- [댓글] 섹션에 일정 변경/취소/연기 등 중요 정보가 있으면 반드시 반영!
 
 === 활동 기록 ===
 ${activityTexts}
@@ -641,8 +651,8 @@ ${activityTexts}
 ## 응답 형식:
 고객사: [추출한 고객사명]
 
-(1) [날짜] [활동유형 또는 활동유형 예정]:
-[진행사항 요약 - 최대 3줄로 핵심 내용 정리]
+(1) [날짜] [활동유형]:
+[진행사항 요약 - 댓글 내용 포함하여 최대 3줄로 정리]
 
 (활동 ${activityCount}건을 위 형식으로 각각 요약)`;
 
