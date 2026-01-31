@@ -152,6 +152,13 @@ export default function DealSummaryPage() {
       const from = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000))
       const to = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000))
 
+      console.log('[DealSummary] Fetching with params:', {
+        from: from.toISOString().split('T')[0],
+        to: to.toISOString().split('T')[0],
+        year: selectedYear,
+        pipelineId: pipelineId
+      })
+
       const res = await analyticsApi.getActivityTimelineWithDeals({
         from: from.toISOString().split('T')[0],
         to: to.toISOString().split('T')[0],
@@ -162,6 +169,9 @@ export default function DealSummaryPage() {
         generateSummaries: true
       })
 
+      console.log('[DealSummary] API Response:', res.data)
+      console.log('[DealSummary] dealActivities:', res.data.dealActivities)
+
       // dealActivities 필드에서 데이터 추출
       if (res.data.dealActivities) {
         setRecentActivities({
@@ -170,6 +180,7 @@ export default function DealSummaryPage() {
           deals: res.data.dealActivities.deals
         })
       } else {
+        console.log('[DealSummary] No dealActivities in response')
         setRecentActivities({
           dateRange: res.data.dateRange,
           totalDeals: 0,
@@ -177,7 +188,7 @@ export default function DealSummaryPage() {
         })
       }
     } catch (error) {
-      console.error('Error fetching recent activities:', error)
+      console.error('[DealSummary] Error fetching recent activities:', error)
     } finally {
       setActivitiesLoading(false)
     }
