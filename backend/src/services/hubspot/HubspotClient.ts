@@ -80,7 +80,7 @@ export class HubspotClient {
         'meetings',
         limit,
         after,
-        ['hs_meeting_title', 'hs_meeting_body', 'hs_meeting_start_time', 'hs_meeting_end_time', 'hs_meeting_outcome', 'hs_meeting_location', 'hubspot_owner_id', 'hs_timestamp']
+        ['hs_meeting_title', 'hs_meeting_body', 'hs_meeting_start_time', 'hs_meeting_end_time', 'hs_meeting_outcome', 'hs_meeting_location', 'hubspot_owner_id', 'hs_timestamp', 'hs_internal_meeting_notes']
       );
       return response;
     } catch (error) {
