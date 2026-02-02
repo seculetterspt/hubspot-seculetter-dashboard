@@ -220,8 +220,6 @@ export class HubspotClient {
         50
       );
 
-      console.log(`[Notes] ${objectType}/${activityId}: found ${noteAssoc.results.length} notes`);
-
       if (noteAssoc.results.length > 0) {
         const noteIds = noteAssoc.results.map(r => r.toObjectId);
         for (const noteId of noteIds) {

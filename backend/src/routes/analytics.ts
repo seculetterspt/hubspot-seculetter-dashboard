@@ -69,11 +69,22 @@ router.get('/deal-summary', async (req: Request, res: Response) => {
       // 스테이지별로 그룹화
       const stageMap = new Map<string, any>();
       pipeline.stages.forEach((stage: any) => {
+        // HubSpot API는 probability를 0.0-1.0 사이 소수로 반환 (예: "0.2" = 20%)
+        // 하지만 일부 경우 정수 퍼센트로 반환할 수 있음 (예: "20" = 20%)
+        const rawProbability = parseFloat(stage.metadata?.probability || '0');
+
+        // 확률이 1보다 크면 정수 퍼센트로 간주 (예: 20 -> 0.2)
+        // 1 이하면 이미 소수 형식 (예: 0.2)
+        const probabilityDecimal = rawProbability > 1 ? rawProbability / 100 : rawProbability;
+        // UI 표시용 퍼센트 (예: 20)
+        const probabilityPercent = rawProbability > 1 ? rawProbability : rawProbability * 100;
+
         stageMap.set(stage.id, {
           id: stage.id,
           label: stage.label,
           displayOrder: stage.displayOrder,
-          probability: parseFloat(stage.metadata?.probability || '0'),
+          probability: probabilityPercent, // UI 표시용 퍼센트
+          probabilityDecimal: probabilityDecimal, // 계산용 소수
           deals: [],
           totalAmount: 0,
           weightedAmount: 0,
@@ -87,7 +98,8 @@ router.get('/deal-summary', async (req: Request, res: Response) => {
         const stage = stageMap.get(stageId);
         if (stage) {
           const amount = parseFloat(deal.properties.amount) || 0;
-          const probability = stage.probability / 100;
+          // 계산용 소수 확률 사용 (예: 0.2 = 20%)
+          const probability = stage.probabilityDecimal;
 
           // 최근 7일 이내 변경 이력 추출
           const recentChanges: Array<{
@@ -611,17 +623,6 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
 
       // AI 요약 생성 (딜별) + 회사명 추출
       if (generateSummaries === 'true' && sortedDealActivities.length > 0) {
-        // 댓글 데이터 확인 로그
-        const activitiesWithComments = sortedDealActivities.flatMap(e => e.activities).filter(a => a.comments && a.comments.length > 0);
-        console.log(`[AI Summary] Activities with comments: ${activitiesWithComments.length}`);
-        if (activitiesWithComments.length > 0) {
-          console.log(`[AI Summary] Sample comments:`, activitiesWithComments.slice(0, 2).map(a => ({
-            type: a.type,
-            title: a.title,
-            commentsCount: a.comments?.length
-          })));
-        }
-
         const summaryPromises = sortedDealActivities.map(async (entry) => {
           try {
             // 활동 내용을 날짜와 함께 상세하게 포함 (댓글 포함)
