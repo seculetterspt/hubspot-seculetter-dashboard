@@ -281,7 +281,7 @@ class SnapshotService {
 
   // 주간 비교 데이터 가져오기
   async getWeeklyComparison(pipelineId: string, targetYear: number): Promise<WeeklyComparison> {
-    // 현재 데이터 가져오기
+    // 현재 라이브 데이터 가져오기 (HubSpot API에서 직접)
     const currentData = await this.getCurrentPipelineData(pipelineId, targetYear);
     const current = currentData[0]?.totals || {
       totalAmount: 0,
@@ -291,9 +291,8 @@ class SnapshotService {
       totalCount: 0
     };
 
-    // 이전 스냅샷 가져오기 (가장 최근 월요일 기준)
-    const lastMonday = this.getLastMonday();
-    const previousResult = await this.getPreviousSnapshot(pipelineId, targetYear, lastMonday);
+    // 가장 최근 스냅샷 가져오기 (날짜 제한 없이)
+    const previousResult = await this.getLatestSnapshot(pipelineId, targetYear);
 
     if (!previousResult) {
       return {
@@ -317,6 +316,34 @@ class SnapshotService {
         closedWonAmount: current.closedWonAmount - previous.closedWonAmount,
         totalCount: current.totalCount - previous.totalCount
       }
+    };
+  }
+
+  // 가장 최근 스냅샷 조회 (날짜 제한 없이)
+  async getLatestSnapshot(pipelineId: string, targetYear: number): Promise<{ data: PipelineTotals; snapshotDate: string } | null> {
+    const result = await pool.query(
+      `SELECT snapshot_date, total_amount, weighted_amount, open_amount, closed_won_amount, total_count
+       FROM weekly_pipeline_snapshot
+       WHERE pipeline_id = $1 AND target_year = $2
+       ORDER BY snapshot_date DESC
+       LIMIT 1`,
+      [pipelineId, targetYear]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    return {
+      data: {
+        totalAmount: parseFloat(row.total_amount) || 0,
+        weightedAmount: parseFloat(row.weighted_amount) || 0,
+        openAmount: parseFloat(row.open_amount) || 0,
+        closedWonAmount: parseFloat(row.closed_won_amount) || 0,
+        totalCount: parseInt(row.total_count) || 0
+      },
+      snapshotDate: row.snapshot_date.toISOString().split('T')[0]
     };
   }
 
