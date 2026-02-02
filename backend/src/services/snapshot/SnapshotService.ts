@@ -29,6 +29,7 @@ interface PipelineSnapshot {
 interface WeeklyComparison {
   current: PipelineTotals;
   previous: PipelineTotals | null;
+  previousSnapshotDate: string | null; // 이전 스냅샷 날짜 (YYYY-MM-DD)
   changes: {
     totalAmount: number;
     weightedAmount: number;
@@ -222,13 +223,13 @@ class SnapshotService {
     return lastMonday;
   }
 
-  // 이전 스냅샷 조회
-  async getPreviousSnapshot(pipelineId: string, targetYear: number, beforeDate?: Date): Promise<PipelineTotals | null> {
+  // 이전 스냅샷 조회 (날짜 포함)
+  async getPreviousSnapshot(pipelineId: string, targetYear: number, beforeDate?: Date): Promise<{ data: PipelineTotals; snapshotDate: string } | null> {
     const date = beforeDate || new Date();
     const dateStr = date.toISOString().split('T')[0];
 
     const result = await pool.query(
-      `SELECT total_amount, weighted_amount, open_amount, closed_won_amount, total_count, by_stage
+      `SELECT snapshot_date, total_amount, weighted_amount, open_amount, closed_won_amount, total_count, by_stage
        FROM weekly_pipeline_snapshot
        WHERE pipeline_id = $1 AND target_year = $2 AND snapshot_date < $3
        ORDER BY snapshot_date DESC
@@ -242,11 +243,14 @@ class SnapshotService {
 
     const row = result.rows[0];
     return {
-      totalAmount: parseFloat(row.total_amount) || 0,
-      weightedAmount: parseFloat(row.weighted_amount) || 0,
-      openAmount: parseFloat(row.open_amount) || 0,
-      closedWonAmount: parseFloat(row.closed_won_amount) || 0,
-      totalCount: parseInt(row.total_count) || 0
+      data: {
+        totalAmount: parseFloat(row.total_amount) || 0,
+        weightedAmount: parseFloat(row.weighted_amount) || 0,
+        openAmount: parseFloat(row.open_amount) || 0,
+        closedWonAmount: parseFloat(row.closed_won_amount) || 0,
+        totalCount: parseInt(row.total_count) || 0
+      },
+      snapshotDate: row.snapshot_date.toISOString().split('T')[0]
     };
   }
 
@@ -289,19 +293,23 @@ class SnapshotService {
 
     // 이전 스냅샷 가져오기 (가장 최근 월요일 기준)
     const lastMonday = this.getLastMonday();
-    const previous = await this.getPreviousSnapshot(pipelineId, targetYear, lastMonday);
+    const previousResult = await this.getPreviousSnapshot(pipelineId, targetYear, lastMonday);
 
-    if (!previous) {
+    if (!previousResult) {
       return {
         current,
         previous: null,
+        previousSnapshotDate: null,
         changes: null
       };
     }
 
+    const previous = previousResult.data;
+
     return {
       current,
       previous,
+      previousSnapshotDate: previousResult.snapshotDate,
       changes: {
         totalAmount: current.totalAmount - previous.totalAmount,
         weightedAmount: current.weightedAmount - previous.weightedAmount,

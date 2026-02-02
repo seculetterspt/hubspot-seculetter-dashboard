@@ -124,6 +124,7 @@ interface WeeklyComparison {
     closedWonAmount: number
     totalCount: number
   } | null
+  previousSnapshotDate: string | null
   changes: WeeklyChanges | null
 }
 
@@ -162,6 +163,13 @@ const formatCountChange = (change: number): { text: string; isPositive: boolean 
     text: change >= 0 ? `+${change}건` : `${change}건`,
     isPositive: change >= 0
   }
+}
+
+// 스냅샷 날짜 포맷 (M/D 기준)
+const formatSnapshotDate = (dateStr: string | null): string => {
+  if (!dateStr) return '전주 대비'
+  const date = new Date(dateStr)
+  return `${date.getMonth() + 1}/${date.getDate()} 기준`
 }
 
 // 날짜 포맷 함수
@@ -416,7 +424,7 @@ export default function DealSummaryPage() {
                   }`}>
                     {weeklyComparison.changes.totalAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
                     <span>{formatChange(weeklyComparison.changes.totalAmount).text}</span>
-                    <span className="text-gray-400 text-xs ml-1">전주 대비</span>
+                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
                   </div>
                 )}
               </div>
@@ -434,7 +442,7 @@ export default function DealSummaryPage() {
                   }`}>
                     {weeklyComparison.changes.weightedAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
                     <span>{formatChange(weeklyComparison.changes.weightedAmount).text}</span>
-                    <span className="text-gray-400 text-xs ml-1">전주 대비</span>
+                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
                   </div>
                 )}
               </div>
@@ -452,7 +460,7 @@ export default function DealSummaryPage() {
                   }`}>
                     {weeklyComparison.changes.openAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
                     <span>{formatChange(weeklyComparison.changes.openAmount).text}</span>
-                    <span className="text-gray-400 text-xs ml-1">전주 대비</span>
+                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
                   </div>
                 )}
               </div>
@@ -470,7 +478,7 @@ export default function DealSummaryPage() {
                   }`}>
                     {weeklyComparison.changes.closedWonAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
                     <span>{formatChange(weeklyComparison.changes.closedWonAmount).text}</span>
-                    <span className="text-gray-400 text-xs ml-1">전주 대비</span>
+                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
                   </div>
                 )}
               </div>
@@ -488,7 +496,7 @@ export default function DealSummaryPage() {
                   }`}>
                     {weeklyComparison.changes.totalCount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
                     <span>{formatCountChange(weeklyComparison.changes.totalCount).text}</span>
-                    <span className="text-gray-400 text-xs ml-1">전주 대비</span>
+                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
                   </div>
                 )}
               </div>
