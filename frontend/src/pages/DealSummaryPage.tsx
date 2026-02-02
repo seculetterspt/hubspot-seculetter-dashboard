@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, ExternalLink, ChevronLeft, ChevronRight, TrendingUp, DollarSign, Target, Calendar, User, Sparkles, Building2, Phone, FileText, Mail, ArrowUpRight } from 'lucide-react'
-import { analyticsApi } from '../services/api'
+import { RefreshCw, ExternalLink, ChevronLeft, ChevronRight, TrendingUp, DollarSign, Target, Calendar, User, Sparkles, Building2, Phone, FileText, Mail, ArrowUpRight, ArrowUp, ArrowDown } from 'lucide-react'
+import { analyticsApi, snapshotApi } from '../services/api'
 
 // HubSpot Portal ID
 const HUBSPOT_PORTAL_ID = '243367573'
@@ -100,6 +100,34 @@ interface DealRecentActivitiesData {
   deals: DealRecentActivity[]
 }
 
+// 주간 비교 데이터
+interface WeeklyChanges {
+  totalAmount: number
+  weightedAmount: number
+  openAmount: number
+  closedWonAmount: number
+  totalCount: number
+}
+
+interface WeeklyComparison {
+  current: {
+    totalAmount: number
+    weightedAmount: number
+    openAmount: number
+    closedWonAmount: number
+    totalCount: number
+  }
+  previous: {
+    totalAmount: number
+    weightedAmount: number
+    openAmount: number
+    closedWonAmount: number
+    totalCount: number
+  } | null
+  previousSnapshotDate: string | null
+  changes: WeeklyChanges | null
+}
+
 // 금액 포맷 함수 (억/만원 단위)
 const formatAmount = (amount: number): string => {
   if (amount >= 100000000) {
@@ -110,6 +138,38 @@ const formatAmount = (amount: number): string => {
     return `${thousands.toFixed(0)}만`
   }
   return `${amount.toLocaleString()}원`
+}
+
+// 변경 금액 포맷 (부호 포함)
+const formatChange = (change: number): { text: string; isPositive: boolean } => {
+  const absAmount = Math.abs(change)
+  let text = ''
+  if (absAmount >= 100000000) {
+    text = `${(absAmount / 100000000).toFixed(2)}억`
+  } else if (absAmount >= 10000) {
+    text = `${(absAmount / 10000).toFixed(0)}만`
+  } else {
+    text = `${absAmount.toLocaleString()}원`
+  }
+  return {
+    text: change >= 0 ? `+${text}` : `-${text}`,
+    isPositive: change >= 0
+  }
+}
+
+// 변경 건수 포맷 (부호 포함)
+const formatCountChange = (change: number): { text: string; isPositive: boolean } => {
+  return {
+    text: change >= 0 ? `+${change}건` : `${change}건`,
+    isPositive: change >= 0
+  }
+}
+
+// 스냅샷 날짜 포맷 (M/D 기준)
+const formatSnapshotDate = (dateStr: string | null): string => {
+  if (!dateStr) return '전주 대비'
+  const date = new Date(dateStr)
+  return `${date.getMonth() + 1}/${date.getDate()} 기준`
 }
 
 // 날짜 포맷 함수
@@ -150,10 +210,24 @@ const isRecentlyModified = (lastModified: string): boolean => {
 export default function DealSummaryPage() {
   const [data, setData] = useState<DealSummaryData | null>(null)
   const [recentActivities, setRecentActivities] = useState<DealRecentActivitiesData | null>(null)
+  const [weeklyComparison, setWeeklyComparison] = useState<WeeklyComparison | null>(null)
   const [loading, setLoading] = useState(true)
   const [activitiesLoading, setActivitiesLoading] = useState(false)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null)
+
+  // 주간 비교 데이터 조회
+  const fetchWeeklyComparison = async (pipelineId: string) => {
+    try {
+      const res = await snapshotApi.getComparison(pipelineId, selectedYear)
+      if (res.data.success) {
+        setWeeklyComparison(res.data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching weekly comparison:', error)
+      setWeeklyComparison(null)
+    }
+  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -230,6 +304,8 @@ export default function DealSummaryPage() {
       // 파이프라인 변경 시 기존 활동 데이터 초기화 (로딩 표시)
       setRecentActivities(null)
       fetchRecentActivities(selectedPipeline)
+      // 주간 비교 데이터 조회
+      fetchWeeklyComparison(selectedPipeline)
     }
   }, [selectedPipeline, selectedYear])
 
@@ -342,6 +418,15 @@ export default function DealSummaryPage() {
                 <p className="text-2xl font-bold text-gray-900">
                   ₩{formatAmount(currentPipeline.totals.totalAmount)}
                 </p>
+                {weeklyComparison?.changes && (
+                  <div className={`flex items-center gap-1 mt-1 text-sm ${
+                    weeklyComparison.changes.totalAmount >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {weeklyComparison.changes.totalAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                    <span>{formatChange(weeklyComparison.changes.totalAmount).text}</span>
+                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
+                  </div>
+                )}
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center gap-2 text-gray-500 mb-1">
@@ -351,6 +436,15 @@ export default function DealSummaryPage() {
                 <p className="text-2xl font-bold text-blue-600">
                   ₩{formatAmount(currentPipeline.totals.weightedAmount)}
                 </p>
+                {weeklyComparison?.changes && (
+                  <div className={`flex items-center gap-1 mt-1 text-sm ${
+                    weeklyComparison.changes.weightedAmount >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {weeklyComparison.changes.weightedAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                    <span>{formatChange(weeklyComparison.changes.weightedAmount).text}</span>
+                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
+                  </div>
+                )}
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center gap-2 text-gray-500 mb-1">
@@ -360,6 +454,15 @@ export default function DealSummaryPage() {
                 <p className="text-2xl font-bold text-orange-600">
                   ₩{formatAmount(currentPipeline.totals.openAmount)}
                 </p>
+                {weeklyComparison?.changes && (
+                  <div className={`flex items-center gap-1 mt-1 text-sm ${
+                    weeklyComparison.changes.openAmount >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {weeklyComparison.changes.openAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                    <span>{formatChange(weeklyComparison.changes.openAmount).text}</span>
+                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
+                  </div>
+                )}
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center gap-2 text-gray-500 mb-1">
@@ -369,6 +472,15 @@ export default function DealSummaryPage() {
                 <p className="text-2xl font-bold text-green-600">
                   ₩{formatAmount(currentPipeline.totals.closedWonAmount)}
                 </p>
+                {weeklyComparison?.changes && (
+                  <div className={`flex items-center gap-1 mt-1 text-sm ${
+                    weeklyComparison.changes.closedWonAmount >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {weeklyComparison.changes.closedWonAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                    <span>{formatChange(weeklyComparison.changes.closedWonAmount).text}</span>
+                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
+                  </div>
+                )}
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center gap-2 text-gray-500 mb-1">
@@ -378,6 +490,15 @@ export default function DealSummaryPage() {
                 <p className="text-2xl font-bold text-gray-900">
                   {currentPipeline.totals.totalCount}건
                 </p>
+                {weeklyComparison?.changes && (
+                  <div className={`flex items-center gap-1 mt-1 text-sm ${
+                    weeklyComparison.changes.totalCount >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {weeklyComparison.changes.totalCount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                    <span>{formatCountChange(weeklyComparison.changes.totalCount).text}</span>
+                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
+                  </div>
+                )}
               </div>
             </div>
           </>

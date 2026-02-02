@@ -87,4 +87,27 @@ export const analyticsApi = {
   },
 }
 
+// Snapshot API functions
+export const snapshotApi = {
+  // 주간 비교 데이터 조회
+  getComparison: (pipelineId: string, year?: number) => {
+    const params = new URLSearchParams()
+    params.append('pipelineId', pipelineId)
+    if (year) params.append('year', year.toString())
+    return api.get(`/snapshot/comparison?${params.toString()}`)
+  },
+  // 스냅샷 수동 생성
+  createSnapshot: (date?: string) => {
+    return api.post('/snapshot/create', { date })
+  },
+  // 스냅샷 이력 조회
+  getHistory: (pipelineId: string, year?: number, limit?: number) => {
+    const params = new URLSearchParams()
+    params.append('pipelineId', pipelineId)
+    if (year) params.append('year', year.toString())
+    if (limit) params.append('limit', limit.toString())
+    return api.get(`/snapshot/history?${params.toString()}`)
+  },
+}
+
 export default api

@@ -256,6 +256,23 @@ export async function initDatabase(): Promise<void> {
         UNIQUE(activity_id)
       );
 
+      -- 주간 파이프라인 스냅샷 (매주 월요일 오전 7시)
+      CREATE TABLE IF NOT EXISTS weekly_pipeline_snapshot (
+        id SERIAL PRIMARY KEY,
+        snapshot_date DATE NOT NULL,
+        pipeline_id VARCHAR(50) NOT NULL,
+        pipeline_label VARCHAR(255),
+        target_year INTEGER NOT NULL,
+        total_amount DECIMAL(15, 2) DEFAULT 0,
+        weighted_amount DECIMAL(15, 2) DEFAULT 0,
+        open_amount DECIMAL(15, 2) DEFAULT 0,
+        closed_won_amount DECIMAL(15, 2) DEFAULT 0,
+        total_count INTEGER DEFAULT 0,
+        by_stage JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(snapshot_date, pipeline_id, target_year)
+      );
+
       -- 인덱스 생성
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_date ON deal_stage_changes(changed_at);
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_deal ON deal_stage_changes(deal_id);
@@ -263,6 +280,8 @@ export async function initDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_stalled_deals_days ON stalled_deals(days_stalled);
       CREATE INDEX IF NOT EXISTS idx_activity_summaries_date ON activity_summaries(activity_date);
       CREATE INDEX IF NOT EXISTS idx_activity_summaries_activity ON activity_summaries(activity_id);
+      CREATE INDEX IF NOT EXISTS idx_weekly_pipeline_snapshot_date ON weekly_pipeline_snapshot(snapshot_date);
+      CREATE INDEX IF NOT EXISTS idx_weekly_pipeline_snapshot_pipeline ON weekly_pipeline_snapshot(pipeline_id, target_year);
     `);
     console.log('Database initialized successfully');
   } finally {
