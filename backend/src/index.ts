@@ -55,6 +55,15 @@ async function start() {
       await initDatabase();
       console.log('Database connected');
 
+      // 서버 시작 시 첫 스냅샷 생성 (이번 주 기준)
+      console.log('[Startup] Creating initial snapshot...');
+      try {
+        await snapshotService.saveSnapshot();
+        console.log('[Startup] Initial snapshot created successfully');
+      } catch (error) {
+        console.error('[Startup] Initial snapshot failed:', error);
+      }
+
       // 매주 월요일 오전 7시에 스냅샷 생성 (한국 시간 기준)
       // cron format: 분 시 일 월 요일
       // 0 7 * * 1 = 매주 월요일 7:00
