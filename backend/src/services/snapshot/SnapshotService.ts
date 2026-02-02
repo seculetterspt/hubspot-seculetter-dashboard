@@ -291,8 +291,8 @@ class SnapshotService {
       totalCount: 0
     };
 
-    // 가장 최근 스냅샷 가져오기 (날짜 제한 없이)
-    const previousResult = await this.getLatestSnapshot(pipelineId, targetYear);
+    // 이전 주 스냅샷 가져오기 (스냅샷 2개 이상이면 두 번째로 최신 것 사용)
+    const previousResult = await this.getPreviousWeekSnapshot(pipelineId, targetYear);
 
     if (!previousResult) {
       return {
@@ -319,14 +319,17 @@ class SnapshotService {
     };
   }
 
-  // 가장 최근 스냅샷 조회 (날짜 제한 없이)
-  async getLatestSnapshot(pipelineId: string, targetYear: number): Promise<{ data: PipelineTotals; snapshotDate: string } | null> {
+  // 이전 주 스냅샷 조회 (비교용)
+  // - 스냅샷이 1개면: 그 스냅샷 반환
+  // - 스냅샷이 2개 이상이면: 두 번째로 최신 스냅샷 반환 (이전 주)
+  async getPreviousWeekSnapshot(pipelineId: string, targetYear: number): Promise<{ data: PipelineTotals; snapshotDate: string } | null> {
+    // 최신 2개 스냅샷 조회
     const result = await pool.query(
       `SELECT snapshot_date, total_amount, weighted_amount, open_amount, closed_won_amount, total_count
        FROM weekly_pipeline_snapshot
        WHERE pipeline_id = $1 AND target_year = $2
        ORDER BY snapshot_date DESC
-       LIMIT 1`,
+       LIMIT 2`,
       [pipelineId, targetYear]
     );
 
@@ -334,7 +337,9 @@ class SnapshotService {
       return null;
     }
 
-    const row = result.rows[0];
+    // 스냅샷이 1개면 그것을 사용, 2개 이상이면 두 번째(이전 주) 사용
+    const row = result.rows.length === 1 ? result.rows[0] : result.rows[1];
+
     return {
       data: {
         totalAmount: parseFloat(row.total_amount) || 0,
