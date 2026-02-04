@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import session from 'express-session';
+import { sign as signCookie } from 'cookie-signature';
 import { HubSpotOAuthService } from '../services/oauth.js';
 import { isEmailAllowed } from '../middleware/allowlist.js';
 
@@ -184,9 +185,12 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
 
       if (!setCookieHeader) {
         console.log('[OAuth Callback] ⚠️ express-session did not set Set-Cookie, setting manually...');
-        const cookieValue = `connect.sid=${req.sessionID}; Path=/; HttpOnly; Secure; SameSite=Lax`;
+        // Sign the session ID properly - express-session expects signed cookies
+        const secret = process.env.SESSION_SECRET || 'dev-secret-change-in-production';
+        const signed = signCookie(req.sessionID, secret);
+        const cookieValue = `connect.sid=s%3A${signed}; Path=/; HttpOnly; Secure; SameSite=Lax`;
         res.setHeader('Set-Cookie', cookieValue);
-        console.log('[OAuth Callback] ✅ Set-Cookie manually set to:', cookieValue);
+        console.log('[OAuth Callback] ✅ Set-Cookie manually set to (signed): connect.sid=s%3A...${signature}');
       } else {
         console.log('[OAuth Callback] ✅ Set-Cookie already set by express-session');
       }
