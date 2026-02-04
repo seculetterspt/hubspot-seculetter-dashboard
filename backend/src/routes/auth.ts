@@ -178,9 +178,22 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
       console.log('[OAuth Callback] Session ID:', req.sessionID);
       console.log('[OAuth Callback] Session data:', req.session.user);
 
-      // Check what headers are set before redirect
+      // Manually set Set-Cookie header if express-session didn't
       const setCookieHeader = res.getHeader('Set-Cookie');
-      console.log('[OAuth Callback] Set-Cookie header before redirect:', setCookieHeader);
+      console.log('[OAuth Callback] Set-Cookie header before manual set:', setCookieHeader);
+
+      if (!setCookieHeader) {
+        console.log('[OAuth Callback] ⚠️ express-session did not set Set-Cookie, setting manually...');
+        const cookieValue = `connect.sid=${req.sessionID}; Path=/; HttpOnly; Secure; SameSite=Lax`;
+        res.setHeader('Set-Cookie', cookieValue);
+        console.log('[OAuth Callback] ✅ Set-Cookie manually set to:', cookieValue);
+      } else {
+        console.log('[OAuth Callback] ✅ Set-Cookie already set by express-session');
+      }
+
+      // Check what headers are set after manual set
+      const finalSetCookie = res.getHeader('Set-Cookie');
+      console.log('[OAuth Callback] Set-Cookie header after manual set:', finalSetCookie);
       console.log('[OAuth Callback] All response headers:', res.getHeaders());
 
       // Redirect to frontend (not backend)
