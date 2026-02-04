@@ -49,6 +49,16 @@ app.use(session({
   },
 }));
 
+// Debug middleware: Log session details after session middleware
+app.use((req, res, next) => {
+  console.log('[Session Middleware] Incoming request');
+  console.log('[Session Middleware] Raw cookie header:', req.headers.cookie);
+  console.log('[Session Middleware] sessionID from request:', req.sessionID);
+  console.log('[Session Middleware] session object exists:', !!req.session);
+  console.log('[Session Middleware] session.user:', req.session?.user);
+  next();
+});
+
 // Validate and touch session on each request
 app.use(validateSession);
 
