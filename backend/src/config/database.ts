@@ -290,6 +290,28 @@ export async function initDatabase(): Promise<void> {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Session table for express-session + connect-pg-simple
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        PRIMARY KEY ("sid")
+      );
+
+      -- Audit logs table for write operation tracking
+      CREATE TABLE IF NOT EXISTS "audit_logs" (
+        "id" SERIAL PRIMARY KEY,
+        "timestamp" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "user_email" VARCHAR(255) NOT NULL,
+        "action_type" VARCHAR(50) NOT NULL,
+        "target_id" VARCHAR(255),
+        "target_type" VARCHAR(50),
+        "status" VARCHAR(20) NOT NULL,
+        "error_message" TEXT,
+        "metadata" JSONB,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- 인덱스 생성
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_date ON deal_stage_changes(changed_at);
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_deal ON deal_stage_changes(deal_id);
@@ -301,6 +323,10 @@ export async function initDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_weekly_pipeline_snapshot_pipeline ON weekly_pipeline_snapshot(pipeline_id, target_year);
       CREATE INDEX IF NOT EXISTS idx_meeting_records_created ON meeting_records(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_meeting_records_status ON meeting_records(hubspot_status);
+      CREATE INDEX IF NOT EXISTS IDX_session_expire ON "session" ("expire");
+      CREATE INDEX IF NOT EXISTS IDX_audit_logs_user_email ON "audit_logs" ("user_email");
+      CREATE INDEX IF NOT EXISTS IDX_audit_logs_timestamp ON "audit_logs" ("timestamp" DESC);
+      CREATE INDEX IF NOT EXISTS IDX_audit_logs_action_type ON "audit_logs" ("action_type");
     `);
     console.log('Database initialized successfully');
   } finally {
