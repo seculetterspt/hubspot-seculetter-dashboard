@@ -338,12 +338,17 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       console.error('Error fetching notes for timeline:', error);
     }
 
-    // 미팅 조회 (예정된 미팅 포함)
+    // 미팅 조회 (HubSpot에 내용이 기록된 미팅만 표시)
     try {
       const meetingsRes = await hubspotClient.getMeetings(100);
       const filteredMeetings = meetingsRes.results.filter(m => {
         const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
-        return startTime && startTime >= fromDate && startTime <= toDate;
+        if (!startTime || startTime < fromDate || startTime > toDate) return false;
+        // HubSpot에 기록되지 않은 미팅(본문/내부노트 없음) 제외
+        const hasBody = !!(m.properties.hs_meeting_body?.trim());
+        const hasNotes = !!(m.properties.hs_internal_meeting_notes?.trim());
+        const isCompleted = m.properties.hs_meeting_outcome === 'COMPLETED';
+        return hasBody || hasNotes || isCompleted;
       });
 
       for (const meeting of filteredMeetings) {

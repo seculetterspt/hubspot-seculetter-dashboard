@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Calendar, Briefcase, PenSquare } from 'lucide-react'
+import { Calendar, Briefcase, PenSquare, ClipboardList } from 'lucide-react'
 
 interface LayoutProps {
   children: ReactNode
@@ -12,6 +12,7 @@ export default function Layout({ children }: LayoutProps) {
   const navItems = [
     { path: '/', label: '타임라인', mobileLabel: '타임라인', icon: Calendar },
     { path: '/meeting/new', label: '미팅 기록', mobileLabel: '기록', icon: PenSquare, isAction: true },
+    { path: '/meeting/records', label: '기록 관리', mobileLabel: '관리', icon: ClipboardList },
     { path: '/deals', label: '딜 요약', mobileLabel: '딜 요약', icon: Briefcase },
   ]
 

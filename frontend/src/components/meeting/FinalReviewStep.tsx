@@ -40,6 +40,7 @@ export default function FinalReviewStep({ data, onBack }: Props) {
         associations: data.finalAssociations,
         meetingId: data.selectedMeeting?.id || undefined,
         ownerId: data.owner?.id || undefined,
+        ownerName: data.owner?.name || undefined,
       })
       setSaved(true)
       if (result.data.associationErrors?.length > 0) {
