@@ -1,6 +1,19 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
 
+declare global {
+  namespace Express {
+    interface Request {
+      rateLimit?: {
+        limit: number;
+        current: number;
+        remaining: number;
+        resetTime: number | undefined;
+      };
+    }
+  }
+}
+
 /**
  * Rate limiting middleware for sensitive endpoints
  * Limits per session (using session ID as key)
