@@ -29,9 +29,11 @@ const sessionStore = new PostgresqlStore({
 });
 
 // Middleware
-// Serve static files from frontend build
-const publicPath = path.join(__dirname, '../../public');
+// Serve static files from frontend build (relative to where npm start is run from)
+const publicPath = path.join(process.cwd(), 'public');
 app.use(express.static(publicPath));
+
+console.log('[Server] Serving static files from:', publicPath);
 
 // Session middleware
 app.use(session({
