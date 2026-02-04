@@ -168,14 +168,22 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
       console.log('[OAuth Callback] ✅ Session saved successfully');
       console.log('[OAuth Callback] Session ID:', req.sessionID);
       console.log('[OAuth Callback] Session data:', req.session.user);
-      console.log('[OAuth Callback] Setting Set-Cookie header');
+
+      // Check what headers are set before redirect
+      const setCookieHeader = res.getHeader('Set-Cookie');
+      console.log('[OAuth Callback] Set-Cookie header before redirect:', setCookieHeader);
+      console.log('[OAuth Callback] All response headers:', res.getHeaders());
 
       // Redirect to frontend (not backend)
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const returnUrl = stateData.returnUrl || '/';
       const redirectUrl = `${frontendUrl}${returnUrl}`;
       console.log('[OAuth Callback] Redirecting to:', redirectUrl);
+
       res.redirect(redirectUrl);
+
+      // Check headers after redirect call
+      console.log('[OAuth Callback] Set-Cookie header after redirect:', res.getHeader('Set-Cookie'));
     });
   } catch (error) {
     console.error('Error in /auth/hubspot/callback:', error);
