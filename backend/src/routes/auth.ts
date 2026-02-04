@@ -155,9 +155,18 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
       loginTimestamp: Date.now(),
     };
 
+    console.log('[OAuth Callback] Session object set:', req.session.user);
+    console.log('[OAuth Callback] Before save - sessionID:', req.sessionID);
+    console.log('[OAuth Callback] Before save - response.headersSent:', res.headersSent);
+
     // Save session
-    console.log('[OAuth Callback] Saving session with user:', userEmail);
+    console.log('[OAuth Callback] Calling req.session.save()...');
     req.session.save((err) => {
+      console.log('[OAuth Callback] Inside session.save() callback');
+      console.log('[OAuth Callback] Callback err:', err);
+      console.log('[OAuth Callback] After save - response.headersSent:', res.headersSent);
+      console.log('[OAuth Callback] After save - sessionID:', req.sessionID);
+
       if (err) {
         console.error('[OAuth Callback] ❌ Error saving session:', err);
         return res.status(500).json({
@@ -185,6 +194,7 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
       // Check headers after redirect call
       console.log('[OAuth Callback] Set-Cookie header after redirect:', res.getHeader('Set-Cookie'));
     });
+    console.log('[OAuth Callback] After req.session.save() call (before callback)');
   } catch (error) {
     console.error('Error in /auth/hubspot/callback:', error);
     res.status(500).json({
