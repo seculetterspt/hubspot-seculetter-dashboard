@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, Loader2, Building2, Briefcase, User, Check, X, Link } from 'lucide-react'
+import { ChevronLeft, Loader2, Building2, Briefcase, User, Check, Link } from 'lucide-react'
 import { api } from '../../services/api'
 
 interface Association {
