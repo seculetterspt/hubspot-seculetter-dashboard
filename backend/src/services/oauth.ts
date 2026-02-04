@@ -14,6 +14,7 @@ interface HubSpotUserInfo {
 
 const HUBSPOT_AUTH_BASE = 'https://app.hubspot.com';
 const HUBSPOT_API_BASE = 'https://api.hubapi.com';
+const HUBSPOT_OAUTH_TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token';
 
 /**
  * HubSpot OAuth Service
@@ -76,7 +77,7 @@ export class HubSpotOAuthService {
       });
 
       const response = await axios.post(
-        `${HUBSPOT_AUTH_BASE}/oauth/token`,
+        HUBSPOT_OAUTH_TOKEN_URL,
         params.toString(),
         {
           headers: {
@@ -93,7 +94,7 @@ export class HubSpotOAuthService {
         statusText: error.response?.statusText,
         data: error.response?.data,
         message: error.message,
-        url: `${HUBSPOT_AUTH_BASE}/oauth/token`,
+        url: HUBSPOT_OAUTH_TOKEN_URL,
       });
       throw new Error('Failed to exchange authorization code');
     }
