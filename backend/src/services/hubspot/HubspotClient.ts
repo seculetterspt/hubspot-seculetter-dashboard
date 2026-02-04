@@ -297,6 +297,82 @@ export class HubspotClient {
       throw error;
     }
   }
+
+  // Search companies by name (for mobile meeting log autocomplete)
+  async searchCompanies(query: string, limit = 5): Promise<{ id: string; name: string }[]> {
+    try {
+      const response = await this.client.crm.companies.searchApi.doSearch({
+        query,
+        limit,
+        properties: ['name'],
+        filterGroups: [],
+        sorts: [],
+        after: '0',
+      });
+      return response.results.map(c => ({
+        id: c.id,
+        name: c.properties.name || '(회사명 없음)',
+      }));
+    } catch (error) {
+      console.error('Error searching companies:', error);
+      return [];
+    }
+  }
+
+  // Search deals by name (for mobile meeting log autocomplete)
+  async searchDeals(query: string, limit = 5): Promise<{ id: string; name: string; companyName?: string }[]> {
+    try {
+      const response = await this.client.crm.deals.searchApi.doSearch({
+        query,
+        limit,
+        properties: ['dealname'],
+        filterGroups: [],
+        sorts: [],
+        after: '0',
+      });
+      return response.results.map(d => ({
+        id: d.id,
+        name: d.properties.dealname || '(거래명 없음)',
+      }));
+    } catch (error) {
+      console.error('Error searching deals:', error);
+      return [];
+    }
+  }
+
+  // Create a meeting object in HubSpot
+  async createMeeting(properties: Record<string, string>) {
+    try {
+      const response = await this.client.crm.objects.basicApi.create('meetings', {
+        properties,
+      });
+      return response;
+    } catch (error) {
+      console.error('Error creating meeting:', error);
+      throw error;
+    }
+  }
+
+  // Associate a meeting with another object (companies, deals, contacts)
+  async associateMeetingWith(toObjectType: string, meetingId: string, toObjectId: string) {
+    try {
+      await this.client.crm.associations.v4.basicApi.create(
+        'meetings',
+        meetingId,
+        toObjectType,
+        toObjectId,
+        [{
+          associationCategory: 'HUBSPOT_DEFINED' as any,
+          associationTypeId: toObjectType === 'companies' ? 200
+            : toObjectType === 'deals' ? 212
+            : 200,
+        }]
+      );
+    } catch (error) {
+      console.error(`Error associating meeting with ${toObjectType}:`, error);
+      throw error;
+    }
+  }
 }
 
 export const hubspotClient = new HubspotClient();

@@ -5,6 +5,7 @@ import cron from 'node-cron';
 import { initDatabase } from './config/database.js';
 import analyticsRouter from './routes/analytics.js';
 import snapshotRouter from './routes/snapshot.js';
+import meetingsRouter from './routes/meetings.js';
 import { snapshotService } from './services/snapshot/SnapshotService.js';
 
 dotenv.config();
@@ -25,6 +26,7 @@ app.use(express.json());
 // Routes
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/snapshot', snapshotRouter);
+app.use('/api/meetings', meetingsRouter);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -42,7 +44,9 @@ app.get('/api', (req, res) => {
       'GET /api/analytics/deal-summary',
       'POST /api/snapshot/create',
       'GET /api/snapshot/comparison',
-      'GET /api/snapshot/history'
+      'GET /api/snapshot/history',
+      'GET /api/meetings/search',
+      'POST /api/meetings/log'
     ]
   });
 });
