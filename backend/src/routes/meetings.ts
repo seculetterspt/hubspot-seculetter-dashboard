@@ -45,7 +45,7 @@ router.get('/owners', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────
 router.get('/scheduled', async (req: Request, res: Response) => {
   try {
-    const { ownerId, days = '3' } = req.query;
+    const { ownerId, days = '3', myOnly } = req.query;
     const dayRange = parseInt(days as string) || 3;
 
     const now = new Date();
@@ -58,7 +58,8 @@ router.get('/scheduled', async (req: Request, res: Response) => {
       const startTime = m.properties.hs_meeting_start_time
         ? new Date(m.properties.hs_meeting_start_time) : null;
       if (!startTime || startTime < from || startTime > to) return false;
-      if (ownerId && m.properties.hubspot_owner_id !== ownerId) return false;
+      // myOnly=true일 때만 owner 필터 적용
+      if (myOnly === 'true' && ownerId && m.properties.hubspot_owner_id !== ownerId) return false;
       return true;
     });
 
@@ -151,7 +152,7 @@ router.post('/transcribe', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────
 router.post('/structure', async (req: Request, res: Response) => {
   try {
-    const { transcript, meetingContext, clarificationAnswers } = req.body;
+    const { transcript, meetingContext, clarificationAnswers, manualMemo } = req.body;
 
     if (!transcript) {
       return res.status(400).json({ error: 'No transcript provided' });
@@ -163,6 +164,10 @@ router.post('/structure', async (req: Request, res: Response) => {
 
     const answersInfo = clarificationAnswers?.length > 0
       ? `\n\n[이전 질문에 대한 답변]\n${clarificationAnswers.map((a: any) => `Q: ${a.question}\nA: ${a.answer}`).join('\n')}`
+      : '';
+
+    const memoInfo = manualMemo
+      ? `\n\n[작성자 추가 메모 - 높은 신뢰도]\n${manualMemo}`
       : '';
 
     const systemPrompt = `당신은 B2B 보안솔루션(SecuLetter) 영업 미팅 내용을 구조화하는 전문 비서입니다.
@@ -199,7 +204,7 @@ router.post('/structure', async (req: Request, res: Response) => {
   ]
 }`;
 
-    const userPrompt = `${contextInfo ? `[미팅 정보]\n${contextInfo}\n\n` : ''}[녹음 내용]\n${transcript}${answersInfo}`;
+    const userPrompt = `${contextInfo ? `[미팅 정보]\n${contextInfo}\n\n` : ''}[녹음 내용]\n${transcript}${memoInfo}${answersInfo}`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -357,27 +362,56 @@ router.post('/save', async (req: Request, res: Response) => {
 
     // 연결 생성 (기존 + 새로 추가된 것 모두)
     const allAssociations = associations || { companies: [], contacts: [], deals: [] };
+    const associationErrors: string[] = [];
+
+    console.log(`[Save] Meeting ${resultMeetingId} - Associations to create:`,
+      `companies=${(allAssociations.companies || []).length}`,
+      `deals=${(allAssociations.deals || []).length}`,
+      `contacts=${(allAssociations.contacts || []).length}`);
 
     for (const company of allAssociations.companies || []) {
       try {
+        console.log(`[Save] Associating meeting ${resultMeetingId} → company ${company.id} (${company.name})`);
         await hubspotClient.associateMeetingWith('companies', resultMeetingId, company.id);
-      } catch (e) { /* 이미 연결된 경우 무시 */ }
+        console.log(`[Save] ✓ company ${company.id} associated`);
+      } catch (e: any) {
+        const msg = `company ${company.id} (${company.name}): ${e.body?.message || e.message || 'unknown error'}`;
+        console.error(`[Save] ✗ ${msg}`);
+        associationErrors.push(msg);
+      }
     }
     for (const deal of allAssociations.deals || []) {
       try {
+        console.log(`[Save] Associating meeting ${resultMeetingId} → deal ${deal.id} (${deal.name})`);
         await hubspotClient.associateMeetingWith('deals', resultMeetingId, deal.id);
-      } catch (e) { /* 이미 연결된 경우 무시 */ }
+        console.log(`[Save] ✓ deal ${deal.id} associated`);
+      } catch (e: any) {
+        const msg = `deal ${deal.id} (${deal.name}): ${e.body?.message || e.message || 'unknown error'}`;
+        console.error(`[Save] ✗ ${msg}`);
+        associationErrors.push(msg);
+      }
     }
     for (const contact of allAssociations.contacts || []) {
       try {
+        console.log(`[Save] Associating meeting ${resultMeetingId} → contact ${contact.id} (${contact.name})`);
         await hubspotClient.associateMeetingWith('contacts', resultMeetingId, contact.id);
-      } catch (e) { /* 이미 연결된 경우 무시 */ }
+        console.log(`[Save] ✓ contact ${contact.id} associated`);
+      } catch (e: any) {
+        const msg = `contact ${contact.id} (${contact.name}): ${e.body?.message || e.message || 'unknown error'}`;
+        console.error(`[Save] ✗ ${msg}`);
+        associationErrors.push(msg);
+      }
+    }
+
+    if (associationErrors.length > 0) {
+      console.warn(`[Save] Meeting ${resultMeetingId} saved but ${associationErrors.length} association(s) failed`);
     }
 
     res.json({
       success: true,
       meetingId: resultMeetingId,
       action: meetingId ? 'updated' : 'created',
+      associationErrors: associationErrors.length > 0 ? associationErrors : undefined,
     });
   } catch (error) {
     console.error('Error saving meeting:', error);

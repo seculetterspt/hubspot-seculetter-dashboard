@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   ChevronLeft, Loader2, Target, MessageSquare, AlertTriangle,
   Lightbulb, CheckCircle2, ListTodo, ArrowRight, HelpCircle,
-  ThumbsUp, Minus, ThumbsDown, Star, RotateCcw
+  ThumbsUp, Minus, ThumbsDown, Star, RotateCcw, ChevronDown, ChevronUp, PenLine
 } from 'lucide-react'
 import { api } from '../../services/api'
 
@@ -27,6 +27,8 @@ interface ClarificationQuestion {
   answer?: string
 }
 
+type Phase = 'memo' | 'loading' | 'result' | 'error'
+
 interface Props {
   transcript: string
   meetingContext?: {
@@ -39,21 +41,24 @@ interface Props {
 }
 
 export default function StructuredReviewStep({ transcript, meetingContext, onStructured, onBack }: Props) {
-  const [loading, setLoading] = useState(true)
+  const [phase, setPhase] = useState<Phase>('memo')
+  const [manualMemo, setManualMemo] = useState('')
+  const [memoExpanded, setMemoExpanded] = useState(false)
   const [content, setContent] = useState<StructuredContent | null>(null)
   const [questions, setQuestions] = useState<ClarificationQuestion[]>([])
   const [answers, setAnswers] = useState<Record<number, string>>({})
   const [reStructuring, setReStructuring] = useState(false)
   const [error, setError] = useState('')
 
-  const fetchStructure = async (clarificationAnswers?: { question: string; answer: string }[]) => {
+  const fetchStructure = async (clarificationAnswers?: { question: string; answer: string }[], memo?: string) => {
     try {
-      setLoading(true)
+      setPhase('loading')
       setError('')
       const res = await api.post('/meetings/structure', {
         transcript,
         meetingContext,
         clarificationAnswers,
+        manualMemo: memo || manualMemo || undefined,
       })
 
       const data = res.data
@@ -73,17 +78,12 @@ export default function StructuredReviewStep({ transcript, meetingContext, onStr
       })
       setQuestions(data.clarification_questions || [])
       setAnswers({})
+      setPhase('result')
     } catch {
       setError('AI 정리에 실패했습니다')
-    } finally {
-      setLoading(false)
+      setPhase('error')
     }
   }
-
-  useEffect(() => {
-    fetchStructure()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const handleReStructure = async () => {
     const answeredQuestions = questions
@@ -126,7 +126,59 @@ export default function StructuredReviewStep({ transcript, meetingContext, onStr
     }
   }
 
-  if (loading) {
+  // 메모 입력 단계
+  if (phase === 'memo') {
+    return (
+      <div className="max-w-lg mx-auto pb-6">
+        <div className="flex items-center gap-3 mb-5 pt-2">
+          <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-gray-100">
+            <ChevronLeft size={24} className="text-gray-600" />
+          </button>
+          <h1 className="text-xl font-bold text-gray-900">AI 정리 준비</h1>
+        </div>
+
+        {/* 트랜스크립트 미리보기 */}
+        <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 mb-4">
+          <p className="text-xs font-semibold text-gray-500 mb-2">녹음 내용 (변환됨)</p>
+          <p className="text-sm text-gray-700 leading-relaxed line-clamp-4">{transcript}</p>
+        </div>
+
+        {/* 추가 메모 (선택) */}
+        <button
+          onClick={() => setMemoExpanded(!memoExpanded)}
+          className="w-full flex items-center gap-2 px-4 py-3 bg-white rounded-xl border border-gray-200 mb-2 text-sm font-medium text-gray-600"
+        >
+          <PenLine size={16} className="text-primary-500" />
+          <span className="flex-1 text-left">추가 메모 (선택)</span>
+          {memoExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+
+        {memoExpanded && (
+          <div className="mb-4">
+            <textarea
+              value={manualMemo}
+              onChange={(e) => setManualMemo(e.target.value)}
+              placeholder="녹음에서 빠진 내용, 보충 사항, 핵심 키워드 등을 입력하세요..."
+              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-400 resize-none"
+              rows={4}
+            />
+            <p className="text-xs text-gray-400 mt-1 px-1">
+              AI가 높은 신뢰도로 반영합니다
+            </p>
+          </div>
+        )}
+
+        <button
+          onClick={() => fetchStructure(undefined, manualMemo)}
+          className="w-full py-4 bg-primary-600 text-white font-bold text-lg rounded-2xl hover:bg-primary-700 active:bg-primary-800 transition-colors shadow-lg"
+        >
+          AI 정리 시작
+        </button>
+      </div>
+    )
+  }
+
+  if (phase === 'loading') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <Loader2 size={48} className="animate-spin text-primary-600 mb-6" />
@@ -136,7 +188,7 @@ export default function StructuredReviewStep({ transcript, meetingContext, onStr
     )
   }
 
-  if (error) {
+  if (phase === 'error') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
         <p className="text-red-500 mb-4">{error}</p>

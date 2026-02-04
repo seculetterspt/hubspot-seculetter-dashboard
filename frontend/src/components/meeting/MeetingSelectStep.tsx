@@ -27,11 +27,16 @@ interface Props {
 export default function MeetingSelectStep({ ownerId, onSelect, onSkip, onBack }: Props) {
   const [meetings, setMeetings] = useState<Record<string, Meeting[]>>({})
   const [loading, setLoading] = useState(true)
+  const [myOnly, setMyOnly] = useState(false)
 
   useEffect(() => {
     const fetchMeetings = async () => {
+      setLoading(true)
       try {
-        const res = await api.get(`/meetings/scheduled?ownerId=${ownerId}&days=3`)
+        const params = new URLSearchParams({ days: '3' })
+        if (ownerId) params.set('ownerId', ownerId)
+        if (myOnly) params.set('myOnly', 'true')
+        const res = await api.get(`/meetings/scheduled?${params.toString()}`)
         setMeetings(res.data.meetings || {})
       } catch {
         // 미팅 로드 실패 시 빈 상태 유지
@@ -40,7 +45,7 @@ export default function MeetingSelectStep({ ownerId, onSelect, onSkip, onBack }:
       }
     }
     fetchMeetings()
-  }, [ownerId])
+  }, [ownerId, myOnly])
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00')
@@ -78,11 +83,21 @@ export default function MeetingSelectStep({ ownerId, onSelect, onSkip, onBack }:
 
   return (
     <div className="max-w-lg mx-auto">
-      <div className="flex items-center gap-3 mb-6 pt-2">
+      <div className="flex items-center gap-3 mb-4 pt-2">
         <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-gray-100">
           <ChevronLeft size={24} className="text-gray-600" />
         </button>
-        <h1 className="text-xl font-bold text-gray-900">미팅 선택</h1>
+        <h1 className="text-xl font-bold text-gray-900 flex-1">미팅 선택</h1>
+        <button
+          onClick={() => setMyOnly(!myOnly)}
+          className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
+            myOnly
+              ? 'bg-primary-100 text-primary-700 border border-primary-300'
+              : 'bg-gray-100 text-gray-500 border border-gray-200'
+          }`}
+        >
+          내 미팅만
+        </button>
       </div>
 
       <div className="space-y-6 px-1">
