@@ -66,23 +66,35 @@ export class HubSpotOAuthService {
   async exchangeCodeForTokens(code: string): Promise<HubSpotOAuthTokenResponse> {
     this.validateConfig();
     try {
-      // HubSpot OAuth token endpoint expects form-encoded data, not JSON
-      const params = new URLSearchParams();
-      params.append('grant_type', 'authorization_code');
-      params.append('client_id', this.clientId);
-      params.append('client_secret', this.clientSecret);
-      params.append('redirect_uri', this.redirectUri);
-      params.append('code', code);
-
-      const response = await axios.post(`${HUBSPOT_AUTH_BASE}/oauth/token`, params, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+      // HubSpot OAuth token endpoint expects form-encoded data
+      const params = new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        redirect_uri: this.redirectUri,
+        code: code,
       });
+
+      const response = await axios.post(
+        `${HUBSPOT_AUTH_BASE}/oauth/token`,
+        params.toString(),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+          },
+        }
+      );
 
       return response.data;
     } catch (error: any) {
-      console.error('Error exchanging code for tokens:', error.response?.data || error.message);
+      console.error('Error exchanging code for tokens:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        url: `${HUBSPOT_AUTH_BASE}/oauth/token`,
+      });
       throw new Error('Failed to exchange authorization code');
     }
   }
