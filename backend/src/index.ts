@@ -44,6 +44,7 @@ app.use(session({
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost',
   },
 }));
 
