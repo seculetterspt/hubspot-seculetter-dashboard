@@ -362,6 +362,21 @@ export class HubspotClient {
     }
   }
 
+  // Get a single meeting by ID
+  async getMeetingById(meetingId: string) {
+    try {
+      const response = await this.client.crm.objects.basicApi.getById(
+        'meetings',
+        meetingId,
+        ['hs_meeting_title', 'hs_meeting_body', 'hs_meeting_start_time', 'hs_meeting_end_time', 'hs_meeting_outcome', 'hs_internal_meeting_notes']
+      );
+      return response;
+    } catch (error) {
+      console.error('Error fetching meeting by ID:', error);
+      throw error;
+    }
+  }
+
   // Update a meeting object in HubSpot
   async updateMeeting(meetingId: string, properties: Record<string, string>) {
     try {

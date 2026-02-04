@@ -344,8 +344,24 @@ router.post('/save', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No structured content provided' });
     }
 
+    // 마크다운 텍스트를 HubSpot HTML로 변환
+    const toHubspotHtml = (text: string): string => {
+      return text
+        .split('\n')
+        .map(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return '<br>';
+          // 섹션 헤더 (불릿 아닌 줄) → 볼드 처리
+          if (!trimmed.startsWith('- ') && !trimmed.startsWith('[')) {
+            return `<strong>${trimmed}</strong>`;
+          }
+          return trimmed;
+        })
+        .join('<br>');
+    };
+
     // HubSpot 노트 본문 구성 (clean, professional, no emojis)
-    const body = structuredContent.detail_markdown || [
+    const bodyMarkdown = structuredContent.detail_markdown || [
       structuredContent.meeting_purpose ? `미팅 목적\n- ${structuredContent.meeting_purpose}` : '',
       structuredContent.key_discussions ? `주요 논의\n${structuredContent.key_discussions}` : '',
       structuredContent.customer_needs ? `고객 니즈 / Pain Point\n- ${structuredContent.customer_needs}` : '',
@@ -357,11 +373,13 @@ router.post('/save', async (req: Request, res: Response) => {
       structuredContent.next_steps ? `다음 단계\n- ${structuredContent.next_steps}` : '',
     ].filter(Boolean).join('\n\n');
 
+    const bodyHtml = toHubspotHtml(bodyMarkdown);
+
     const outcomeLabel = structuredContent.meeting_outcome === 'positive' ? '긍정적' :
                          structuredContent.meeting_outcome === 'negative' ? '부정적' : '보통';
 
     // 내부 노트 (매니저 가시성, no emojis)
-    const internalNotes = [
+    const internalNotesMarkdown = [
       `[1줄 요약] ${structuredContent.summary_one_liner}`,
       `[미팅 결과] ${outcomeLabel}`,
       structuredContent.follow_up_required ? '[후속조치 필요]' : '',
@@ -371,14 +389,35 @@ router.post('/save', async (req: Request, res: Response) => {
         : '',
     ].filter(Boolean).join('\n');
 
+    const internalNotesHtml = toHubspotHtml(internalNotesMarkdown);
+
     let resultMeetingId: string;
 
     if (meetingId) {
-      // 기존 미팅 업데이트
+      // 기존 미팅 업데이트 - 기존 본문 보존 후 뒤에 추가
+      let finalBody = bodyHtml;
+      let finalNotes = internalNotesHtml;
+
+      try {
+        const existing = await hubspotClient.getMeetingById(meetingId);
+        const existingBody = existing.properties.hs_meeting_body?.trim() || '';
+        const existingNotes = existing.properties.hs_internal_meeting_notes?.trim() || '';
+
+        if (existingBody) {
+          finalBody = existingBody + '<br><br><hr><br><strong>[AI 미팅 기록]</strong><br>' + bodyHtml;
+        }
+        if (existingNotes) {
+          finalNotes = existingNotes + '<br><br>---<br>' + internalNotesHtml;
+        }
+      } catch (fetchErr: any) {
+        console.warn(`[Save] Could not fetch existing meeting ${meetingId}:`, fetchErr.message);
+        // 기존 미팅 조회 실패 시 새 본문만 저장
+      }
+
       await hubspotClient.updateMeeting(meetingId, {
-        hs_meeting_body: body,
+        hs_meeting_body: finalBody,
         hs_meeting_outcome: 'COMPLETED',
-        hs_internal_meeting_notes: internalNotes,
+        hs_internal_meeting_notes: finalNotes,
       });
       resultMeetingId = meetingId;
     } else {
@@ -386,11 +425,11 @@ router.post('/save', async (req: Request, res: Response) => {
       const now = new Date();
       const meeting = await hubspotClient.createMeeting({
         hs_meeting_title: structuredContent.summary_one_liner || '미팅 기록',
-        hs_meeting_body: body,
+        hs_meeting_body: bodyHtml,
         hs_meeting_start_time: now.toISOString(),
         hs_meeting_end_time: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
         hs_meeting_outcome: 'COMPLETED',
-        hs_internal_meeting_notes: internalNotes,
+        hs_internal_meeting_notes: internalNotesHtml,
         hs_timestamp: now.toISOString(),
         ...(ownerId ? { hubspot_owner_id: ownerId } : {}),
       });
