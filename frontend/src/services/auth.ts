@@ -57,7 +57,16 @@ class AuthService {
       params.append('returnUrl', returnUrl);
     }
     const loginUrl = `${API_BASE}/auth/hubspot/login${params.toString() ? '?' + params.toString() : ''}`;
-    window.location.href = loginUrl;
+    console.log('[AuthService] Redirecting to:', loginUrl);
+
+    // Use window.location for full page navigation
+    if (window.location) {
+      window.location.href = loginUrl;
+    } else {
+      // Fallback for environments where window.location might not work
+      console.error('[AuthService] window.location not available, attempting alternative redirect');
+      window.open(loginUrl, '_self');
+    }
   }
 }
 
