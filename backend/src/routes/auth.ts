@@ -75,6 +75,9 @@ router.get('/hubspot/login', (req: Request, res: Response) => {
  */
 router.get('/hubspot/callback', async (req: Request, res: Response) => {
   try {
+    console.log('[OAuth Callback] Received callback request');
+    console.log('[OAuth Callback] Query params:', { code: req.query.code ? '***' : undefined, state: req.query.state ? '***' : undefined, error: req.query.error, error_description: req.query.error_description });
+
     const { code, state, error, error_description } = req.query;
 
     // Check for OAuth errors
@@ -102,7 +105,9 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
     }
 
     // Exchange code for tokens (identity only)
+    console.log('[OAuth Callback] Exchanging authorization code for tokens...');
     const tokens = await oauthService.exchangeCodeForTokens(code as string);
+    console.log('[OAuth Callback] Token exchange successful');
 
     // CRITICAL: Fetch user identity using the OAuth token
     // then DISCARD the OAuth token - we only need user info
@@ -111,14 +116,16 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
 
     try {
       // Try to get user info from OAuth token
+      console.log('[OAuth Callback] Fetching user info from OAuth token...');
       const userInfo = await oauthService.getUserInfo(tokens.access_token);
       userEmail = userInfo.email;
       userName = userInfo.name;
+      console.log('[OAuth Callback] User info retrieved successfully:', { email: userEmail, name: userName });
     } catch (error) {
       // Fallback: For MVP, we might not have direct access to user email via OAuth
       // In production, implement a proper user identity endpoint
-      console.warn('Could not fetch user info from OAuth token:', error);
-      console.warn('Using fallback: requires additional app-level user identification');
+      console.warn('[OAuth Callback] Could not fetch user info from OAuth token:', error);
+      console.warn('[OAuth Callback] Using fallback: requires additional app-level user identification');
 
       // For now, reject the auth - production systems should implement proper user lookup
       return res.status(500).json({
@@ -128,16 +135,19 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
     }
 
     // Check if email is in allowlist
+    console.log('[OAuth Callback] Checking email allowlist for:', userEmail);
     if (!isEmailAllowed(userEmail)) {
-      console.warn(`Access denied for non-allowlisted email: ${userEmail}`);
+      console.warn(`[OAuth Callback] Access denied for non-allowlisted email: ${userEmail}`);
       return res.status(403).json({
         error: 'Access denied',
         message: 'Your email is not authorized to access this application.',
       });
     }
+    console.log('[OAuth Callback] Email allowlist check passed');
 
     // IMPORTANT: Do not store OAuth token
     // Create session instead
+    console.log('[OAuth Callback] Creating session for user:', userEmail);
     req.session.user = {
       userId: crypto.randomBytes(8).toString('hex'), // Internal user ID
       email: userEmail,
@@ -148,7 +158,7 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
     // Save session
     req.session.save((err) => {
       if (err) {
-        console.error('Error saving session:', err);
+        console.error('[OAuth Callback] Error saving session:', err);
         return res.status(500).json({
           error: 'Session creation failed',
         });
@@ -158,6 +168,7 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const returnUrl = stateData.returnUrl || '/';
       const redirectUrl = `${frontendUrl}${returnUrl}`;
+      console.log('[OAuth Callback] Session saved successfully. Redirecting to:', redirectUrl);
       res.redirect(redirectUrl);
     });
   } catch (error) {
