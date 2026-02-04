@@ -30,7 +30,16 @@ export class HubSpotOAuthService {
     this.redirectUri = process.env.HUBSPOT_OAUTH_REDIRECT_URI || '';
 
     if (!this.clientId || !this.clientSecret || !this.redirectUri) {
-      throw new Error('Missing required HubSpot OAuth environment variables');
+      console.warn('[OAuth] Missing HubSpot OAuth environment variables - OAuth will not be available');
+    }
+  }
+
+  /**
+   * Validate that OAuth is properly configured
+   */
+  private validateConfig(): void {
+    if (!this.clientId || !this.clientSecret || !this.redirectUri) {
+      throw new Error('HubSpot OAuth is not properly configured. Please set HUBSPOT_CLIENT_ID, HUBSPOT_CLIENT_SECRET, and HUBSPOT_OAUTH_REDIRECT_URI environment variables.');
     }
   }
 
@@ -38,6 +47,7 @@ export class HubSpotOAuthService {
    * Generate HubSpot OAuth authorization URL
    */
   getAuthorizationUrl(state: string): string {
+    this.validateConfig();
     const scope = ['crm.objects.contacts.read', 'oauth'].join(' ');
     const params = new URLSearchParams({
       client_id: this.clientId,
@@ -54,6 +64,7 @@ export class HubSpotOAuthService {
    * Exchange authorization code for tokens (identity only)
    */
   async exchangeCodeForTokens(code: string): Promise<HubSpotOAuthTokenResponse> {
+    this.validateConfig();
     try {
       const response = await axios.post(`${HUBSPOT_AUTH_BASE}/oauth/token`, {
         grant_type: 'authorization_code',
@@ -75,6 +86,7 @@ export class HubSpotOAuthService {
    * IMPORTANT: This token is ONLY used for identity verification, then discarded
    */
   async getUserInfo(accessToken: string): Promise<HubSpotUserInfo> {
+    this.validateConfig();
     try {
       const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/contacts`, {
         headers: {
