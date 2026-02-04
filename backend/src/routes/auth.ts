@@ -156,19 +156,25 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
     };
 
     // Save session
+    console.log('[OAuth Callback] Saving session with user:', userEmail);
     req.session.save((err) => {
       if (err) {
-        console.error('[OAuth Callback] Error saving session:', err);
+        console.error('[OAuth Callback] ❌ Error saving session:', err);
         return res.status(500).json({
           error: 'Session creation failed',
         });
       }
 
+      console.log('[OAuth Callback] ✅ Session saved successfully');
+      console.log('[OAuth Callback] Session ID:', req.sessionID);
+      console.log('[OAuth Callback] Session data:', req.session.user);
+      console.log('[OAuth Callback] Setting Set-Cookie header');
+
       // Redirect to frontend (not backend)
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const returnUrl = stateData.returnUrl || '/';
       const redirectUrl = `${frontendUrl}${returnUrl}`;
-      console.log('[OAuth Callback] Session saved successfully. Redirecting to:', redirectUrl);
+      console.log('[OAuth Callback] Redirecting to:', redirectUrl);
       res.redirect(redirectUrl);
     });
   } catch (error) {
@@ -208,7 +214,17 @@ router.post('/logout', (req: Request, res: Response) => {
  * Returns current session/user info (for frontend)
  */
 router.get('/session', (req: Request, res: Response) => {
+  console.log('[Auth Session] GET /auth/session');
+  console.log('[Auth Session] req.sessionID:', req.sessionID);
+  console.log('[Auth Session] req.session exists:', !!req.session);
+  console.log('[Auth Session] req.session.user:', req.session?.user);
+  console.log('[Auth Session] Request headers:', {
+    cookie: req.headers.cookie,
+    origin: req.headers.origin,
+  });
+
   if (req.session?.user) {
+    console.log('[Auth Session] ✅ Session found, returning user data');
     res.json({
       authenticated: true,
       user: {
@@ -218,6 +234,7 @@ router.get('/session', (req: Request, res: Response) => {
       },
     });
   } else {
+    console.log('[Auth Session] ❌ No session or user found');
     res.json({
       authenticated: false,
     });
