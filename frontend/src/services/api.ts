@@ -1,8 +1,7 @@
 import axios from 'axios'
 
-const baseURL = import.meta.env.PROD
-  ? 'https://seculetter-hubspot-api.onrender.com/api'
-  : 'http://localhost:3001/api'
+// Use same domain for API calls (backend serves frontend)
+const baseURL = '/api'
 
 export const api = axios.create({
   baseURL,
