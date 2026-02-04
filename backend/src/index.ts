@@ -28,7 +28,7 @@ const sessionStore = new PostgresqlStore({
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://seculetter-hubspot-dashboard.onrender.com'
+    'https://hubspot-seculetter-dashboard-static-site.onrender.com'
   ],
   credentials: true
 }));
