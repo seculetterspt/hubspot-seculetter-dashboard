@@ -21,7 +21,12 @@ export function LoginPage() {
   }, [isAuthenticated, isLoading, navigate]);
 
   const handleHubSpotLogin = () => {
-    authService.redirectToLogin('/');
+    console.log('[LoginPage] Login button clicked');
+    try {
+      authService.redirectToLogin('/');
+    } catch (error) {
+      console.error('[LoginPage] Login error:', error);
+    }
   };
 
   if (isLoading) {
