@@ -35,6 +35,18 @@ app.use(express.static(publicPath));
 
 console.log('[Server] Serving static files from:', publicPath);
 
+// Disable caching for HTML files to prevent stale code on other devices
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') || req.path === '/') {
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+  }
+  next();
+});
+
 // Session middleware
 app.use(session({
   store: sessionStore,
