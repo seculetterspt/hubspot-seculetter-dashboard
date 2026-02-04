@@ -154,9 +154,11 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
         });
       }
 
-      // Redirect to return URL or home
+      // Redirect to frontend (not backend)
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const returnUrl = stateData.returnUrl || '/';
-      res.redirect(returnUrl);
+      const redirectUrl = `${frontendUrl}${returnUrl}`;
+      res.redirect(redirectUrl);
     });
   } catch (error) {
     console.error('Error in /auth/hubspot/callback:', error);
