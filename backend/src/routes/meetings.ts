@@ -181,8 +181,32 @@ router.post('/structure', async (req: Request, res: Response) => {
 - meeting_outcome은 녹음 톤과 내용을 기반으로 LLM이 판단하세요
 - action_items에는 반드시 담당자와 기한을 포함하세요 (모르면 '미정')
 - summary_one_liner는 타임라인 카드에 표시될 핵심 1줄 (20자 내외)
-- detail_markdown은 HubSpot 노트 본문용 전체 마크다운
+- detail_markdown은 HubSpot CRM 노트 본문용. 아래 형식을 엄격히 따르세요
+- 이모지, 특수 장식 문자 절대 사용 금지
 - 한국어로 작성하세요
+
+detail_markdown 형식 (반드시 이 구조로 작성):
+미팅 목적
+- 내용
+
+주요 논의
+- 항목 1
+- 항목 2
+
+고객 니즈 / Pain Point
+- 항목 1
+
+제안 솔루션
+- 내용
+
+결정 사항
+- 내용
+
+액션 아이템
+- 할 일 (담당자 / 기한)
+
+다음 단계
+- 내용
 
 반드시 아래 JSON 형식으로만 응답하세요:
 {
@@ -196,7 +220,7 @@ router.post('/structure', async (req: Request, res: Response) => {
     { "task": "할 일", "assignee": "담당자", "deadline": "기한 (YYYY-MM-DD 또는 '미정')" }
   ],
   "next_steps": "다음 단계",
-  "detail_markdown": "## 미팅 목적\\n...\\n## 주요 논의\\n...\\n## 결정 사항\\n...\\n## 액션 아이템\\n...\\n## 다음 단계\\n...",
+  "detail_markdown": "미팅 목적\\n- ...\\n\\n주요 논의\\n- ...\\n\\n고객 니즈 / Pain Point\\n- ...\\n\\n제안 솔루션\\n- ...\\n\\n결정 사항\\n- ...\\n\\n액션 아이템\\n- 할 일 (담당자 / 기한)\\n\\n다음 단계\\n- ...",
   "meeting_outcome": "positive | neutral | negative",
   "follow_up_required": true,
   "importance": false,
@@ -278,6 +302,18 @@ JSON으로 응답:
       }
     }
 
+    for (const contactName of (extracted.contacts || [])) {
+      const results = await hubspotClient.searchContacts(contactName, 2);
+      if (results.length > 0) {
+        recommendations.push({
+          type: 'contact',
+          id: results[0].id,
+          name: results[0].name,
+          reason: `미팅에서 "${contactName}" 언급됨`,
+        });
+      }
+    }
+
     for (const dealName of (extracted.deals || [])) {
       const results = await hubspotClient.searchDeals(dealName, 2);
       if (results.length > 0) {
@@ -308,30 +344,30 @@ router.post('/save', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No structured content provided' });
     }
 
-    // HubSpot 노트 본문 구성
+    // HubSpot 노트 본문 구성 (clean, professional, no emojis)
     const body = structuredContent.detail_markdown || [
-      structuredContent.meeting_purpose ? `## 미팅 목적\n${structuredContent.meeting_purpose}` : '',
-      structuredContent.key_discussions ? `## 주요 논의\n${structuredContent.key_discussions}` : '',
-      structuredContent.customer_needs ? `## 고객 니즈\n${structuredContent.customer_needs}` : '',
-      structuredContent.proposed_solution ? `## 제안 솔루션\n${structuredContent.proposed_solution}` : '',
-      structuredContent.decisions ? `## 결정 사항\n${structuredContent.decisions}` : '',
+      structuredContent.meeting_purpose ? `미팅 목적\n- ${structuredContent.meeting_purpose}` : '',
+      structuredContent.key_discussions ? `주요 논의\n${structuredContent.key_discussions}` : '',
+      structuredContent.customer_needs ? `고객 니즈 / Pain Point\n- ${structuredContent.customer_needs}` : '',
+      structuredContent.proposed_solution ? `제안 솔루션\n- ${structuredContent.proposed_solution}` : '',
+      structuredContent.decisions ? `결정 사항\n- ${structuredContent.decisions}` : '',
       structuredContent.action_items?.length > 0
-        ? `## 액션 아이템\n${structuredContent.action_items.map((a: any) => `- ${a.task} (${a.assignee} / ${a.deadline})`).join('\n')}`
+        ? `액션 아이템\n${structuredContent.action_items.map((a: any) => `- ${a.task} (${a.assignee} / ${a.deadline})`).join('\n')}`
         : '',
-      structuredContent.next_steps ? `## 다음 단계\n${structuredContent.next_steps}` : '',
+      structuredContent.next_steps ? `다음 단계\n- ${structuredContent.next_steps}` : '',
     ].filter(Boolean).join('\n\n');
 
     const outcomeLabel = structuredContent.meeting_outcome === 'positive' ? '긍정적' :
                          structuredContent.meeting_outcome === 'negative' ? '부정적' : '보통';
 
-    // 내부 노트 (매니저 가시성)
+    // 내부 노트 (매니저 가시성, no emojis)
     const internalNotes = [
       `[1줄 요약] ${structuredContent.summary_one_liner}`,
       `[미팅 결과] ${outcomeLabel}`,
-      structuredContent.follow_up_required ? '🔄 후속조치 필요' : '',
-      structuredContent.importance ? '⭐ 중요 미팅' : '',
+      structuredContent.follow_up_required ? '[후속조치 필요]' : '',
+      structuredContent.importance ? '[중요 미팅]' : '',
       structuredContent.action_items?.length > 0
-        ? `[액션 아이템]\n${structuredContent.action_items.map((a: any) => `- ${a.task} (${a.assignee}/${a.deadline})`).join('\n')}`
+        ? `[액션 아이템]\n${structuredContent.action_items.map((a: any) => `- ${a.task} (${a.assignee} / ${a.deadline})`).join('\n')}`
         : '',
     ].filter(Boolean).join('\n');
 
@@ -451,14 +487,15 @@ router.get('/search', async (req: Request, res: Response) => {
   try {
     const { q } = req.query;
     if (!q || String(q).length < 2) {
-      return res.json({ companies: [], deals: [] });
+      return res.json({ companies: [], contacts: [], deals: [] });
     }
     const query = String(q);
-    const [companies, deals] = await Promise.all([
+    const [companies, contacts, deals] = await Promise.all([
       hubspotClient.searchCompanies(query, 5),
+      hubspotClient.searchContacts(query, 5),
       hubspotClient.searchDeals(query, 5),
     ]);
-    res.json({ companies, deals });
+    res.json({ companies, contacts, deals });
   } catch (error) {
     console.error('Error searching:', error);
     res.status(500).json({ error: 'Search failed' });

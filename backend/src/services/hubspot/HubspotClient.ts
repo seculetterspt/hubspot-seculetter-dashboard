@@ -319,6 +319,28 @@ export class HubspotClient {
     }
   }
 
+  // Search contacts by name (for mobile meeting log autocomplete)
+  async searchContacts(query: string, limit = 5): Promise<{ id: string; name: string; email?: string }[]> {
+    try {
+      const response = await this.client.crm.contacts.searchApi.doSearch({
+        query,
+        limit,
+        properties: ['firstname', 'lastname', 'email'],
+        filterGroups: [],
+        sorts: [],
+        after: '0',
+      });
+      return response.results.map(c => ({
+        id: c.id,
+        name: `${c.properties.firstname || ''} ${c.properties.lastname || ''}`.trim() || c.properties.email || '(이름 없음)',
+        email: c.properties.email || undefined,
+      }));
+    } catch (error) {
+      console.error('Error searching contacts:', error);
+      return [];
+    }
+  }
+
   // Search deals by name (for mobile meeting log autocomplete)
   async searchDeals(query: string, limit = 5): Promise<{ id: string; name: string; companyName?: string }[]> {
     try {

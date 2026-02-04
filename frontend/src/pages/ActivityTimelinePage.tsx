@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
-import { RefreshCw, Phone, FileText, Calendar, Mail, Sparkles, Building2, User, Briefcase, ExternalLink, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
+import { RefreshCw, Phone, FileText, Calendar, Mail, Sparkles, Building2, User, Briefcase, ExternalLink, MessageSquare, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { api } from '../services/api'
 
 // HubSpot Portal ID
@@ -419,16 +420,25 @@ export default function ActivityTimelinePage() {
             총 {data?.totalCount || 0}건의 활동
           </p>
         </div>
-        <button
-          onClick={() => {
-            loadedDatesRef.current.clear()
-            fetchData()
-          }}
-          className="flex items-center gap-1.5 px-3 py-2 lg:px-4 lg:py-2 bg-primary-600 text-white rounded-lg active:bg-primary-700 hover:bg-primary-700 text-sm"
-        >
-          <RefreshCw size={16} />
-          <span className="hidden sm:inline">새로고침</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/meeting/records"
+            className="flex items-center gap-1.5 px-3 py-2 lg:px-4 lg:py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 active:bg-gray-100 text-sm"
+          >
+            <ClipboardList size={16} />
+            <span className="hidden sm:inline">기록 관리</span>
+          </Link>
+          <button
+            onClick={() => {
+              loadedDatesRef.current.clear()
+              fetchData()
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 lg:px-4 lg:py-2 bg-primary-600 text-white rounded-lg active:bg-primary-700 hover:bg-primary-700 text-sm"
+          >
+            <RefreshCw size={16} />
+            <span className="hidden sm:inline">새로고침</span>
+          </button>
+        </div>
       </div>
 
       {/* ===== MOBILE: Horizontal Date Strip + Activity List ===== */}

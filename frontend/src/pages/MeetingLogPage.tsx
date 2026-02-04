@@ -100,7 +100,10 @@ export default function MeetingLogPage() {
         <MeetingDetailStep
           meeting={data.selectedMeeting!}
           associations={data.meetingAssociations}
-          onConfirm={() => setStep('record')}
+          onConfirm={(updatedAssociations) => {
+            updateData({ meetingAssociations: updatedAssociations })
+            setStep('record')
+          }}
           onBack={() => setStep('meeting-select')}
         />
       )
