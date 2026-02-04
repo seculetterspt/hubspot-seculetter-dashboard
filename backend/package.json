@@ -2,6 +2,7 @@
   "name": "hubspot-seculetter-backend",
   "version": "1.0.0",
   "description": "Seculetter HubSpot Dashboard Backend",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",

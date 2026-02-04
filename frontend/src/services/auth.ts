@@ -1,8 +1,7 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.PROD
-  ? 'https://seculetter-hubspot-api.onrender.com'
-  : 'http://localhost:3001';
+// Use same domain for API calls (backend serves frontend)
+const API_BASE = '';
 
 export interface SessionUser {
   email: string;

@@ -1,5 +1,6 @@
 import express from 'express';
-import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
 import session from 'express-session';
@@ -11,6 +12,9 @@ import meetingsRouter from './routes/meetings.js';
 import authRouter from './routes/auth.js';
 import { isAuthenticated, validateSession } from './middleware/auth.js';
 import { snapshotService } from './services/snapshot/SnapshotService.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -25,13 +29,9 @@ const sessionStore = new PostgresqlStore({
 });
 
 // Middleware
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://hubspot-seculetter-dashboard-static-site.onrender.com'
-  ],
-  credentials: true
-}));
+// Serve static files from frontend build
+const publicPath = path.join(__dirname, '../../public');
+app.use(express.static(publicPath));
 
 // Session middleware
 app.use(session({
@@ -89,6 +89,11 @@ app.get('/api', (req, res) => {
       'GET /api/meetings/search'
     ]
   });
+});
+
+// SPA fallback: serve index.html for all non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(publicPath, 'index.html'));
 });
 
 // Initialize and start server
