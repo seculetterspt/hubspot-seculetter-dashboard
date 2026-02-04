@@ -1,6 +1,7 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Calendar, Briefcase, PenSquare } from 'lucide-react'
+import { Calendar, Briefcase, PenSquare, LogOut, User } from 'lucide-react'
+import { useAuth } from '../../hooks/useAuth'
 
 interface LayoutProps {
   children: ReactNode
@@ -8,6 +9,16 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const { user, logout } = useAuth()
+  const [showUserMenu, setShowUserMenu] = useState(false)
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }
 
   const navItems = [
     { path: '/', label: '타임라인', mobileLabel: '타임라인', icon: Calendar },
@@ -55,8 +66,46 @@ export default function Layout({ children }: LayoutProps) {
           </nav>
         </div>
 
-        <div className="text-xs lg:text-sm text-gray-500 hidden sm:block">
-          HubSpot 계정: 243367573
+        <div className="flex items-center gap-4">
+          <div className="text-xs lg:text-sm text-gray-500 hidden sm:block">
+            HubSpot 계정: 243367573
+          </div>
+
+          {/* User Menu */}
+          {user && (
+            <div className="relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                title={user.email}
+              >
+                <User size={18} className="text-gray-600" />
+                <span className="text-sm text-gray-700 hidden sm:block max-w-[150px] truncate">
+                  {user.name || user.email}
+                </span>
+              </button>
+
+              {/* Dropdown Menu */}
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                  <div className="p-3 border-b border-gray-200">
+                    <p className="text-xs text-gray-500">로그인됨</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false)
+                      handleLogout()
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 transition-colors text-sm font-medium"
+                  >
+                    <LogOut size={16} />
+                    로그아웃
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 

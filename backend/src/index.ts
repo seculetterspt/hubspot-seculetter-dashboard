@@ -2,16 +2,27 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
-import { initDatabase } from './config/database.js';
+import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
+import { initDatabase, pool } from './config/database.js';
 import analyticsRouter from './routes/analytics.js';
 import snapshotRouter from './routes/snapshot.js';
 import meetingsRouter from './routes/meetings.js';
+import authRouter from './routes/auth.js';
+import { isAuthenticated, validateSession } from './middleware/auth.js';
 import { snapshotService } from './services/snapshot/SnapshotService.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Session store setup
+const PostgresqlStore = connectPgSimple(session);
+const sessionStore = new PostgresqlStore({
+  pool: pool,
+  tableName: 'session',
+});
 
 // Middleware
 app.use(cors({
@@ -21,12 +32,33 @@ app.use(cors({
   ],
   credentials: true
 }));
+
+// Session middleware
+app.use(session({
+  store: sessionStore,
+  secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+}));
+
+// Validate and touch session on each request
+app.use(validateSession);
+
 app.use(express.json({ limit: '25mb' }));
 
-// Routes
-app.use('/api/analytics', analyticsRouter);
-app.use('/api/snapshot', snapshotRouter);
-app.use('/api/meetings', meetingsRouter);
+// Auth routes (public)
+app.use('/auth', authRouter);
+
+// Protected API routes (require authentication)
+app.use('/api/analytics', isAuthenticated, analyticsRouter);
+app.use('/api/snapshot', isAuthenticated, snapshotRouter);
+app.use('/api/meetings', isAuthenticated, meetingsRouter);
 
 // Health check
 app.get('/health', (req, res) => {
