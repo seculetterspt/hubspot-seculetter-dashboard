@@ -1,7 +1,19 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import session from 'express-session';
 import { HubSpotOAuthService } from '../services/oauth.js';
 import { isEmailAllowed } from '../middleware/allowlist.js';
+
+declare module 'express-session' {
+  interface SessionData {
+    user?: {
+      userId: string;
+      email: string;
+      name: string;
+      loginTimestamp: number;
+    };
+  }
+}
 
 const router = Router();
 const oauthService = new HubSpotOAuthService();

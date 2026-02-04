@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import session from 'express-session';
 
 /**
  * Extended Request type with session user data
@@ -13,6 +14,17 @@ declare global {
         loginTimestamp: number;
       };
     }
+  }
+}
+
+declare module 'express-session' {
+  interface SessionData {
+    user?: {
+      userId: string;
+      email: string;
+      name: string;
+      loginTimestamp: number;
+    };
   }
 }
 
