@@ -21,7 +21,7 @@ app.use(cors({
   ],
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
 
 // Routes
 app.use('/api/analytics', analyticsRouter);
@@ -45,8 +45,13 @@ app.get('/api', (req, res) => {
       'POST /api/snapshot/create',
       'GET /api/snapshot/comparison',
       'GET /api/snapshot/history',
-      'GET /api/meetings/search',
-      'POST /api/meetings/log'
+      'GET /api/meetings/owners',
+      'GET /api/meetings/scheduled',
+      'POST /api/meetings/transcribe',
+      'POST /api/meetings/structure',
+      'POST /api/meetings/recommend',
+      'POST /api/meetings/save',
+      'GET /api/meetings/search'
     ]
   });
 });
