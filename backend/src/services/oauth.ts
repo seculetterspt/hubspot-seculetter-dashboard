@@ -66,133 +66,63 @@ export class HubSpotOAuthService {
   async exchangeCodeForTokens(code: string): Promise<HubSpotOAuthTokenResponse> {
     this.validateConfig();
     try {
-      const response = await axios.post(`${HUBSPOT_AUTH_BASE}/oauth/token`, {
-        grant_type: 'authorization_code',
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        redirect_uri: this.redirectUri,
-        code: code,
+      // HubSpot OAuth token endpoint expects form-encoded data, not JSON
+      const params = new URLSearchParams();
+      params.append('grant_type', 'authorization_code');
+      params.append('client_id', this.clientId);
+      params.append('client_secret', this.clientSecret);
+      params.append('redirect_uri', this.redirectUri);
+      params.append('code', code);
+
+      const response = await axios.post(`${HUBSPOT_AUTH_BASE}/oauth/token`, params, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
       });
 
       return response.data;
-    } catch (error) {
-      console.error('Error exchanging code for tokens:', error);
+    } catch (error: any) {
+      console.error('Error exchanging code for tokens:', error.response?.data || error.message);
       throw new Error('Failed to exchange authorization code');
     }
   }
 
   /**
    * Fetch user info from HubSpot using OAuth token
+   * For identity verification purposes
    * IMPORTANT: This token is ONLY used for identity verification, then discarded
    */
   async getUserInfo(accessToken: string): Promise<HubSpotUserInfo> {
     this.validateConfig();
     try {
-      const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/contacts`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        params: {
-          limit: 1,
-        },
-      });
-
-      // This endpoint returns contacts, but we need user's own info
-      // For identity, we use a different approach via the access token info
-      // Fetch current user's info from the API
-      const userResponse = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/contacts`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        params: {
-          properties: ['firstname', 'lastname', 'email'],
-          limit: 1,
-        },
-      });
-
-      // Since we can't directly get "current user" from HubSpot OAuth,
-      // we extract from the contact list or use a workaround
-      // For now, extract email from token claims if available
-      const userInfo = await this.getUserInfoFromToken(accessToken);
-      return userInfo;
-    } catch (error) {
-      console.error('Error fetching user info:', error);
-      throw new Error('Failed to fetch user information');
-    }
-  }
-
-  /**
-   * Fetch user info by making an authenticated request
-   * This uses a common HubSpot endpoint that returns current user's portal
-   */
-  private async getUserInfoFromToken(accessToken: string): Promise<HubSpotUserInfo> {
-    try {
-      // Try to fetch from the account info endpoint
-      const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/contacts`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        params: {
-          properties: ['firstname', 'lastname', 'email', 'hs_lead_status'],
-          limit: 1,
-        },
-      });
-
-      // If no contacts, use a fallback approach
-      // In production, you'd want to use HubSpot's user endpoint if available
-      // For now, we'll rely on a custom endpoint or middleware
-
-      if (response.data.results && response.data.results.length > 0) {
-        const contact = response.data.results[0];
-        const props = contact.properties;
-        return {
-          email: props.email || '',
-          name: `${props.firstname || ''} ${props.lastname || ''}`.trim(),
-          portalId: response.data.paging?.source_id || undefined,
-        };
+      // HubSpot OAuth provides user info via the access token endpoint
+      // Decode JWT token to get user claims
+      const parts = accessToken.split('.');
+      if (parts.length !== 3) {
+        throw new Error('Invalid token format');
       }
 
-      throw new Error('Unable to fetch user information');
-    } catch (error) {
-      console.error('Error in getUserInfoFromToken:', error);
-      throw new Error('Failed to extract user information from token');
-    }
-  }
+      // Decode payload (second part)
+      const decodedPayload = JSON.parse(
+        Buffer.from(parts[1], 'base64').toString('utf-8')
+      );
 
-  /**
-   * Alternative: Use HubSpot's custom contact identity lookup
-   * This requires a specific API call to identify the logged-in user
-   */
-  async getUserIdentity(accessToken: string): Promise<HubSpotUserInfo> {
-    try {
-      // HubSpot OAuth tokens can be introspected via /oauth/v1/access-tokens/{token}
-      // But that requires app authentication
-      // Instead, use a practical workaround: fetch authenticated user's email from contacts
+      // Extract user info from JWT claims
+      const email = decodedPayload.email || decodedPayload.user_id || '';
+      const name = decodedPayload.name || 'HubSpot User';
 
-      // Make a request to a known endpoint that should return user data
-      const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/contacts`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        params: {
-          properties: ['firstname', 'lastname', 'email'],
-          limit: 1,
-          archived: 'false',
-        },
-      });
+      if (!email) {
+        throw new Error('Could not extract email from token');
+      }
 
-      // Return mock user info - in production, implement proper user lookup
-      // This is a limitation of HubSpot's OAuth scope for this use case
-      // You may need to add a "read current user" endpoint on backend that's not exposed
-
-      // For MVP: return placeholder and require additional app logic
       return {
-        email: 'user@example.com',
-        name: 'HubSpot User',
+        email,
+        name,
+        portalId: decodedPayload.hub_id,
       };
     } catch (error) {
-      console.error('Error fetching user identity:', error);
-      throw new Error('Failed to verify user identity');
+      console.error('Error fetching user info from token:', error);
+      throw new Error('Failed to verify user identity from OAuth token');
     }
   }
 }
