@@ -367,8 +367,23 @@ export class HubspotClient {
   }
 
   // Associate a meeting with another object (companies, deals, contacts)
+  // HubSpot v4 default association type IDs for meetings:
+  //   meetings → companies: 198
+  //   meetings → contacts:  200
+  //   meetings → deals:     212
   async associateMeetingWith(toObjectType: string, meetingId: string, toObjectId: string) {
+    const typeIdMap: Record<string, number> = {
+      companies: 198,
+      contacts: 200,
+      deals: 212,
+    };
+    const associationTypeId = typeIdMap[toObjectType];
+    if (!associationTypeId) {
+      throw new Error(`Unknown association target type: ${toObjectType}`);
+    }
+
     try {
+      console.log(`[HubSpot] Creating association: meetings/${meetingId} → ${toObjectType}/${toObjectId} (typeId=${associationTypeId})`);
       await this.client.crm.associations.v4.basicApi.create(
         'meetings',
         meetingId,
@@ -376,13 +391,15 @@ export class HubspotClient {
         toObjectId,
         [{
           associationCategory: 'HUBSPOT_DEFINED' as any,
-          associationTypeId: toObjectType === 'companies' ? 200
-            : toObjectType === 'deals' ? 212
-            : 200,
+          associationTypeId,
         }]
       );
-    } catch (error) {
-      console.error(`Error associating meeting with ${toObjectType}:`, error);
+    } catch (error: any) {
+      console.error(`[HubSpot] Association failed: meetings/${meetingId} → ${toObjectType}/${toObjectId}`, {
+        status: error.statusCode || error.code,
+        message: error.body?.message || error.message,
+        details: JSON.stringify(error.body || {}).slice(0, 500),
+      });
       throw error;
     }
   }

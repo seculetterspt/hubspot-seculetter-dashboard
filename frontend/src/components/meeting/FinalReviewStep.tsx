@@ -30,17 +30,21 @@ export default function FinalReviewStep({ data, onBack }: Props) {
   const sc = data.structuredContent
 
   const handleSave = async () => {
+    if (saving || saved) return // 중복 저장 방지
     setSaving(true)
     setError('')
 
     try {
-      await api.post('/meetings/save', {
+      const result = await api.post('/meetings/save', {
         structuredContent: sc,
         associations: data.finalAssociations,
         meetingId: data.selectedMeeting?.id || undefined,
         ownerId: data.owner?.id || undefined,
       })
       setSaved(true)
+      if (result.data.associationErrors?.length > 0) {
+        console.warn('Association errors:', result.data.associationErrors)
+      }
       setTimeout(() => navigate('/'), 2500)
     } catch (err: any) {
       setError(err.response?.data?.error || '저장에 실패했습니다')

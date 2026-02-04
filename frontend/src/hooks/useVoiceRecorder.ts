@@ -17,11 +17,39 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(0)
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
+
+  const acquireWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen')
+        wakeLockRef.current.addEventListener('release', () => {
+          wakeLockRef.current = null
+        })
+      }
+    } catch {
+      // Wake Lock 미지원 또는 권한 거부 시 무시
+    }
+  }
+
+  const releaseWakeLock = async () => {
+    try {
+      if (wakeLockRef.current) {
+        await wakeLockRef.current.release()
+        wakeLockRef.current = null
+      }
+    } catch {
+      // 릴리스 실패 시 무시
+    }
+  }
 
   const startRecording = useCallback(async () => {
     try {
       setError(null)
       chunksRef.current = []
+
+      // 화면 꺼짐 방지 (Wake Lock)
+      await acquireWakeLock()
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -83,6 +111,9 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
 
         // 모든 트랙 정지
         mediaRecorderRef.current?.stream.getTracks().forEach(t => t.stop())
+
+        // Wake Lock 해제
+        releaseWakeLock()
 
         setIsRecording(false)
         if (timerRef.current) {
