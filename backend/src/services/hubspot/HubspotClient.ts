@@ -340,6 +340,19 @@ export class HubspotClient {
     }
   }
 
+  // Update a meeting object in HubSpot
+  async updateMeeting(meetingId: string, properties: Record<string, string>) {
+    try {
+      const response = await this.client.crm.objects.basicApi.update('meetings', meetingId, {
+        properties,
+      });
+      return response;
+    } catch (error) {
+      console.error('Error updating meeting:', error);
+      throw error;
+    }
+  }
+
   // Create a meeting object in HubSpot
   async createMeeting(properties: Record<string, string>) {
     try {
