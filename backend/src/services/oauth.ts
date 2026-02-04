@@ -12,7 +12,7 @@ interface HubSpotUserInfo {
   portalId?: string;
 }
 
-const HUBSPOT_AUTH_BASE = 'https://app.hubspot.com';
+const HUBSPOT_AUTH_BASE = 'https://app-na2.hubspot.com';
 const HUBSPOT_API_BASE = 'https://api.hubapi.com';
 const HUBSPOT_OAUTH_TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token';
 
