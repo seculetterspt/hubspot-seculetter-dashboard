@@ -51,6 +51,8 @@ app.get('/api', (req, res) => {
       'POST /api/meetings/structure',
       'POST /api/meetings/recommend',
       'POST /api/meetings/save',
+      'GET /api/meetings/records',
+      'DELETE /api/meetings/records/:id',
       'GET /api/meetings/search'
     ]
   });

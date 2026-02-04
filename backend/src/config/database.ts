@@ -273,6 +273,23 @@ export async function initDatabase(): Promise<void> {
         UNIQUE(snapshot_date, pipeline_id, target_year)
       );
 
+      -- 미팅 기록 로컬 테이블 (음성 녹음 → HubSpot 저장 추적)
+      CREATE TABLE IF NOT EXISTS meeting_records (
+        id SERIAL PRIMARY KEY,
+        owner_id VARCHAR(50),
+        owner_name VARCHAR(255),
+        hubspot_meeting_id VARCHAR(50),
+        is_new_meeting BOOLEAN DEFAULT false,
+        summary TEXT,
+        structured_content JSONB,
+        associations JSONB DEFAULT '{}',
+        hubspot_status VARCHAR(20) DEFAULT 'saved',
+        hubspot_error TEXT,
+        association_errors JSONB DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- 인덱스 생성
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_date ON deal_stage_changes(changed_at);
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_deal ON deal_stage_changes(deal_id);
@@ -282,6 +299,8 @@ export async function initDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_activity_summaries_activity ON activity_summaries(activity_id);
       CREATE INDEX IF NOT EXISTS idx_weekly_pipeline_snapshot_date ON weekly_pipeline_snapshot(snapshot_date);
       CREATE INDEX IF NOT EXISTS idx_weekly_pipeline_snapshot_pipeline ON weekly_pipeline_snapshot(pipeline_id, target_year);
+      CREATE INDEX IF NOT EXISTS idx_meeting_records_created ON meeting_records(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_meeting_records_status ON meeting_records(hubspot_status);
     `);
     console.log('Database initialized successfully');
   } finally {

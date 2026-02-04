@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
 import { toFile } from 'openai';
 import { hubspotClient } from '../services/hubspot/HubspotClient.js';
+import { pool } from '../config/database.js';
 
 const router = Router();
 
@@ -407,6 +408,30 @@ router.post('/save', async (req: Request, res: Response) => {
       console.warn(`[Save] Meeting ${resultMeetingId} saved but ${associationErrors.length} association(s) failed`);
     }
 
+    // 로컬 DB에 미팅 기록 저장 (추적용)
+    try {
+      if (process.env.DATABASE_URL) {
+        await pool.query(
+          `INSERT INTO meeting_records
+            (owner_id, owner_name, hubspot_meeting_id, is_new_meeting, summary, structured_content, associations, hubspot_status, association_errors)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            ownerId || null,
+            req.body.ownerName || null,
+            resultMeetingId,
+            !meetingId,
+            structuredContent.summary_one_liner || '',
+            JSON.stringify(structuredContent),
+            JSON.stringify(allAssociations),
+            'saved',
+            JSON.stringify(associationErrors),
+          ]
+        );
+      }
+    } catch (dbErr: any) {
+      console.error('[Save] Local DB insert failed:', dbErr.message);
+    }
+
     res.json({
       success: true,
       meetingId: resultMeetingId,
@@ -437,6 +462,52 @@ router.get('/search', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error searching:', error);
     res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 미팅 기록 목록 조회 (로컬 DB)
+// ─────────────────────────────────────────────
+router.get('/records', async (req: Request, res: Response) => {
+  try {
+    if (!process.env.DATABASE_URL) {
+      return res.json({ records: [] });
+    }
+    const result = await pool.query(
+      `SELECT id, owner_id, owner_name, hubspot_meeting_id, is_new_meeting,
+              summary, associations, hubspot_status, hubspot_error,
+              association_errors, created_at
+       FROM meeting_records
+       ORDER BY created_at DESC
+       LIMIT 100`
+    );
+    res.json({ records: result.rows });
+  } catch (error) {
+    console.error('Error fetching meeting records:', error);
+    res.status(500).json({ error: 'Failed to fetch records' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 미팅 기록 삭제 (로컬 DB만, HubSpot은 삭제하지 않음)
+// ─────────────────────────────────────────────
+router.delete('/records/:id', async (req: Request, res: Response) => {
+  try {
+    if (!process.env.DATABASE_URL) {
+      return res.status(400).json({ error: 'Database not configured' });
+    }
+    const { id } = req.params;
+    const result = await pool.query(
+      'DELETE FROM meeting_records WHERE id = $1 RETURNING id',
+      [id]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    res.json({ success: true, deletedId: id });
+  } catch (error) {
+    console.error('Error deleting meeting record:', error);
+    res.status(500).json({ error: 'Failed to delete record' });
   }
 });
 

@@ -3,6 +3,7 @@ import Layout from './components/layout/Layout'
 import ActivityTimelinePage from './pages/ActivityTimelinePage'
 import DealSummaryPage from './pages/DealSummaryPage'
 import MeetingLogPage from './pages/MeetingLogPage'
+import MeetingRecordsPage from './pages/MeetingRecordsPage'
 
 function App() {
   return (
@@ -10,6 +11,7 @@ function App() {
       <Routes>
         <Route path="/" element={<ActivityTimelinePage />} />
         <Route path="/meeting/new" element={<MeetingLogPage />} />
+        <Route path="/meeting/records" element={<MeetingRecordsPage />} />
         <Route path="/deals" element={<DealSummaryPage />} />
       </Routes>
     </Layout>
