@@ -320,53 +320,53 @@ export default function DealSummaryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">딜 요약</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">딜 요약</h1>
+          <p className="text-gray-500 text-sm mt-1">
             파이프라인별 스테이지 현황
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* 연도 선택 */}
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-1 sm:gap-2 bg-white border border-gray-200 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2">
             <button
               onClick={() => setSelectedYear(prev => prev - 1)}
               className="p-1 hover:bg-gray-100 rounded"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={16} />
             </button>
-            <span className="font-semibold text-gray-900 min-w-[60px] text-center">
+            <span className="font-semibold text-gray-900 min-w-[50px] text-center text-sm sm:text-base">
               {selectedYear}년
             </span>
             <button
               onClick={() => setSelectedYear(prev => prev + 1)}
               className="p-1 hover:bg-gray-100 rounded"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={16} />
             </button>
           </div>
 
           <button
             onClick={fetchData}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm sm:text-base"
           >
-            <RefreshCw size={18} />
-            새로고침
+            <RefreshCw size={16} />
+            <span className="hidden sm:inline">새로고침</span>
           </button>
         </div>
       </div>
 
       {/* 파이프라인 탭 */}
       {data && data.pipelines.length > 1 && (
-        <div className="flex gap-2 border-b border-gray-200 pb-2">
+        <div className="flex gap-1 sm:gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
           {data.pipelines.map(pipeline => (
             <button
               key={pipeline.id}
               onClick={() => setSelectedPipeline(pipeline.id)}
-              className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
+              className={`px-3 sm:px-4 py-2 rounded-t-lg font-medium transition-colors text-sm sm:text-base whitespace-nowrap ${
                 selectedPipeline === pipeline.id
                   ? 'bg-primary-100 text-primary-700 border-b-2 border-primary-600'
                   : 'text-gray-600 hover:bg-gray-100'
@@ -384,119 +384,119 @@ export default function DealSummaryPage() {
         return (
           <>
             {/* 목표 달성률 */}
-            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-4 md:p-6 text-white">
+              <div className="flex items-center justify-between mb-3 md:mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold opacity-90">목표 달성률</h3>
-                  <p className="text-3xl font-bold mt-1">
+                  <h3 className="text-sm md:text-lg font-semibold opacity-90">목표 달성률</h3>
+                  <p className="text-2xl md:text-3xl font-bold mt-1">
                     {targetInfo.progress.toFixed(1)}%
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm opacity-75">목표</p>
-                  <p className="text-2xl font-bold">₩{targetInfo.label}</p>
+                  <p className="text-xs md:text-sm opacity-75">목표</p>
+                  <p className="text-xl md:text-2xl font-bold">₩{targetInfo.label}</p>
                 </div>
               </div>
-              <div className="w-full bg-white/20 rounded-full h-3">
+              <div className="w-full bg-white/20 rounded-full h-2 md:h-3">
                 <div
-                  className="bg-white rounded-full h-3 transition-all duration-500"
+                  className="bg-white rounded-full h-2 md:h-3 transition-all duration-500"
                   style={{ width: `${targetInfo.progress}%` }}
                 />
               </div>
-              <div className="flex justify-between mt-2 text-sm opacity-75">
-                <span>성사 금액: ₩{formatAmount(currentPipeline.totals.closedWonAmount)}</span>
-                <span>남은 금액: ₩{formatAmount(Math.max(0, targetInfo.target - currentPipeline.totals.closedWonAmount))}</span>
+              <div className="flex justify-between mt-2 text-xs md:text-sm opacity-75">
+                <span>성사: ₩{formatAmount(currentPipeline.totals.closedWonAmount)}</span>
+                <span>남은: ₩{formatAmount(Math.max(0, targetInfo.target - currentPipeline.totals.closedWonAmount))}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center gap-2 text-gray-500 mb-1">
-                  <DollarSign size={16} />
-                  <span className="text-sm">총 거래 금액</span>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-3 md:p-4">
+                <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                  <DollarSign size={14} />
+                  <span className="text-xs md:text-sm">총 거래 금액</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-lg md:text-2xl font-bold text-gray-900">
                   ₩{formatAmount(currentPipeline.totals.totalAmount)}
                 </p>
                 {weeklyComparison?.changes && (
-                  <div className={`flex items-center gap-1 mt-1 text-sm ${
+                  <div className={`flex items-center gap-1 mt-1 text-xs ${
                     weeklyComparison.changes.totalAmount >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {weeklyComparison.changes.totalAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                    {weeklyComparison.changes.totalAmount >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
                     <span>{formatChange(weeklyComparison.changes.totalAmount).text}</span>
-                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
+                    <span className="text-gray-400 text-[10px] ml-0.5">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
                   </div>
                 )}
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center gap-2 text-gray-500 mb-1">
-                  <TrendingUp size={16} />
-                  <span className="text-sm">가중치 적용 금액</span>
+              <div className="bg-white rounded-xl border border-gray-200 p-3 md:p-4">
+                <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                  <TrendingUp size={14} />
+                  <span className="text-xs md:text-sm">가중치 적용 금액</span>
                 </div>
-                <p className="text-2xl font-bold text-blue-600">
+                <p className="text-lg md:text-2xl font-bold text-blue-600">
                   ₩{formatAmount(currentPipeline.totals.weightedAmount)}
                 </p>
                 {weeklyComparison?.changes && (
-                  <div className={`flex items-center gap-1 mt-1 text-sm ${
+                  <div className={`flex items-center gap-1 mt-1 text-xs ${
                     weeklyComparison.changes.weightedAmount >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {weeklyComparison.changes.weightedAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                    {weeklyComparison.changes.weightedAmount >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
                     <span>{formatChange(weeklyComparison.changes.weightedAmount).text}</span>
-                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
+                    <span className="text-gray-400 text-[10px] ml-0.5">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
                   </div>
                 )}
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center gap-2 text-gray-500 mb-1">
-                  <Target size={16} />
-                  <span className="text-sm">미결 거래 금액</span>
+              <div className="bg-white rounded-xl border border-gray-200 p-3 md:p-4">
+                <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                  <Target size={14} />
+                  <span className="text-xs md:text-sm">미결 거래 금액</span>
                 </div>
-                <p className="text-2xl font-bold text-orange-600">
+                <p className="text-lg md:text-2xl font-bold text-orange-600">
                   ₩{formatAmount(currentPipeline.totals.openAmount)}
                 </p>
                 {weeklyComparison?.changes && (
-                  <div className={`flex items-center gap-1 mt-1 text-sm ${
+                  <div className={`flex items-center gap-1 mt-1 text-xs ${
                     weeklyComparison.changes.openAmount >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {weeklyComparison.changes.openAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                    {weeklyComparison.changes.openAmount >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
                     <span>{formatChange(weeklyComparison.changes.openAmount).text}</span>
-                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
+                    <span className="text-gray-400 text-[10px] ml-0.5">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
                   </div>
                 )}
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center gap-2 text-gray-500 mb-1">
-                  <DollarSign size={16} className="text-green-500" />
-                  <span className="text-sm">성사된 거래 금액</span>
+              <div className="bg-white rounded-xl border border-gray-200 p-3 md:p-4">
+                <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                  <DollarSign size={14} className="text-green-500" />
+                  <span className="text-xs md:text-sm">성사된 거래 금액</span>
                 </div>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-lg md:text-2xl font-bold text-green-600">
                   ₩{formatAmount(currentPipeline.totals.closedWonAmount)}
                 </p>
                 {weeklyComparison?.changes && (
-                  <div className={`flex items-center gap-1 mt-1 text-sm ${
+                  <div className={`flex items-center gap-1 mt-1 text-xs ${
                     weeklyComparison.changes.closedWonAmount >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {weeklyComparison.changes.closedWonAmount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                    {weeklyComparison.changes.closedWonAmount >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
                     <span>{formatChange(weeklyComparison.changes.closedWonAmount).text}</span>
-                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
+                    <span className="text-gray-400 text-[10px] ml-0.5">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
                   </div>
                 )}
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center gap-2 text-gray-500 mb-1">
-                  <Calendar size={16} />
-                  <span className="text-sm">총 거래 수</span>
+              <div className="bg-white rounded-xl border border-gray-200 p-3 md:p-4 col-span-2 md:col-span-1">
+                <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                  <Calendar size={14} />
+                  <span className="text-xs md:text-sm">총 거래 수</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-lg md:text-2xl font-bold text-gray-900">
                   {currentPipeline.totals.totalCount}건
                 </p>
                 {weeklyComparison?.changes && (
-                  <div className={`flex items-center gap-1 mt-1 text-sm ${
+                  <div className={`flex items-center gap-1 mt-1 text-xs ${
                     weeklyComparison.changes.totalCount >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {weeklyComparison.changes.totalCount >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                    {weeklyComparison.changes.totalCount >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
                     <span>{formatCountChange(weeklyComparison.changes.totalCount).text}</span>
-                    <span className="text-gray-400 text-xs ml-1">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
+                    <span className="text-gray-400 text-[10px] ml-0.5">{formatSnapshotDate(weeklyComparison.previousSnapshotDate)}</span>
                   </div>
                 )}
               </div>
@@ -648,16 +648,16 @@ export default function DealSummaryPage() {
 
       {/* 최근 2주간 주요 활동 업데이트 */}
       {currentPipeline && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 md:mb-6">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-base md:text-xl font-bold text-gray-900">
                 최근 2주간 주요 활동 업데이트
-                <span className="ml-2 text-base font-normal text-purple-600">
+                <span className="ml-1 md:ml-2 text-sm md:text-base font-normal text-purple-600">
                   ({currentPipeline.label})
                 </span>
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-xs md:text-sm text-gray-500 mt-1">
                 {recentActivities?.dateRange?.from} ~ {recentActivities?.dateRange?.to} |
                 {recentActivities?.totalDeals || 0}개 딜에서 활동 발생
               </p>
@@ -671,20 +671,28 @@ export default function DealSummaryPage() {
           </div>
 
           {recentActivities && recentActivities.deals.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               {recentActivities.deals.map(deal => (
                 <div
                   key={deal.dealId}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                  className="border border-gray-200 rounded-lg p-3 md:p-4 hover:shadow-md transition-shadow"
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4">
                     {/* 회사/딜 정보 */}
-                    <div className="flex-shrink-0 w-48">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Building2 size={16} className="text-blue-500" />
-                        <span className="font-semibold text-gray-900 truncate">
-                          {deal.companyName || '(회사명 추출 중)'}
-                        </span>
+                    <div className="flex-shrink-0 md:w-48">
+                      <div className="flex items-center justify-between md:justify-start gap-2 mb-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Building2 size={16} className="text-blue-500 flex-shrink-0" />
+                          <span className="font-semibold text-gray-900 text-sm md:text-base truncate">
+                            {deal.companyName || '(회사명 추출 중)'}
+                          </span>
+                        </div>
+                        {/* 날짜 - 모바일에서는 회사명 옆에 표시 */}
+                        <div className="flex-shrink-0 text-right text-xs text-gray-400 md:hidden">
+                          <span className="font-medium text-gray-600">
+                            {formatDate(deal.latestActivityDate)}
+                          </span>
+                        </div>
                       </div>
                       <a
                         href={getHubspotDealUrl(deal.dealId)}
@@ -695,8 +703,8 @@ export default function DealSummaryPage() {
                         {deal.dealName}
                         <ExternalLink size={12} />
                       </a>
-                      <div className="mt-2 text-xs text-gray-500">
-                        <span className="inline-block bg-gray-100 px-2 py-0.5 rounded mr-2">
+                      <div className="flex items-center flex-wrap gap-1 mt-2 text-xs text-gray-500">
+                        <span className="inline-block bg-gray-100 px-2 py-0.5 rounded">
                           {deal.stageName}
                         </span>
                         {deal.amount > 0 && (
@@ -704,47 +712,47 @@ export default function DealSummaryPage() {
                             ₩{formatAmount(deal.amount)}
                           </span>
                         )}
-                      </div>
-                      {/* 최근 활동 아이콘들 */}
-                      <div className="flex items-center gap-2 mt-2">
-                        {deal.activities.map((activity, idx) => {
-                          const Icon = activity.type === 'call' ? Phone :
-                                      activity.type === 'meeting' ? Calendar :
-                                      activity.type === 'email' ? Mail : FileText
-                          const color = activity.type === 'call' ? 'text-blue-500' :
-                                       activity.type === 'meeting' ? 'text-purple-500' :
-                                       activity.type === 'email' ? 'text-orange-500' : 'text-green-500'
-                          return (
-                            <div key={idx} className={`${color}`} title={`${activity.title} (${activity.date})`}>
-                              <Icon size={14} />
-                            </div>
-                          )
-                        })}
-                        {deal.activityCount > deal.activities.length && (
-                          <span className="text-xs text-gray-400">+{deal.activityCount - deal.activities.length}</span>
-                        )}
+                        {/* 최근 활동 아이콘들 */}
+                        <div className="flex items-center gap-1.5 ml-1">
+                          {deal.activities.map((activity, idx) => {
+                            const Icon = activity.type === 'call' ? Phone :
+                                        activity.type === 'meeting' ? Calendar :
+                                        activity.type === 'email' ? Mail : FileText
+                            const color = activity.type === 'call' ? 'text-blue-500' :
+                                         activity.type === 'meeting' ? 'text-purple-500' :
+                                         activity.type === 'email' ? 'text-orange-500' : 'text-green-500'
+                            return (
+                              <div key={idx} className={`${color}`} title={`${activity.title} (${activity.date})`}>
+                                <Icon size={14} />
+                              </div>
+                            )
+                          })}
+                          {deal.activityCount > deal.activities.length && (
+                            <span className="text-xs text-gray-400">+{deal.activityCount - deal.activities.length}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     {/* AI 요약 */}
                     <div className="flex-1">
                       {deal.aiSummary ? (
-                        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-100">
-                          <div className="flex items-center gap-1 text-xs text-purple-600 mb-2">
+                        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-3 md:p-4 border border-purple-100">
+                          <div className="flex items-center gap-1 text-xs text-purple-600 mb-1.5 md:mb-2">
                             <Sparkles size={12} />
                             <span className="font-medium">AI 요약</span>
                           </div>
-                          <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-line">{deal.aiSummary}</p>
+                          <p className="text-gray-800 text-xs md:text-sm leading-relaxed whitespace-pre-line">{deal.aiSummary}</p>
                         </div>
                       ) : (
-                        <div className="bg-gray-50 rounded-lg p-4 text-gray-500 text-sm">
+                        <div className="bg-gray-50 rounded-lg p-3 md:p-4 text-gray-500 text-xs md:text-sm">
                           요약 생성 중...
                         </div>
                       )}
                     </div>
 
-                    {/* 날짜 */}
-                    <div className="flex-shrink-0 text-right text-xs text-gray-400">
+                    {/* 날짜 - 데스크톱에서만 표시 */}
+                    <div className="hidden md:block flex-shrink-0 text-right text-xs text-gray-400">
                       <div>최근 활동</div>
                       <div className="font-medium text-gray-600">
                         {formatDate(deal.latestActivityDate)}
@@ -755,9 +763,9 @@ export default function DealSummaryPage() {
               ))}
             </div>
           ) : !activitiesLoading ? (
-            <div className="text-center text-gray-500 py-12">
-              <Calendar size={48} className="mx-auto mb-4 opacity-50" />
-              <p>최근 2주간 활동이 있는 딜이 없습니다</p>
+            <div className="text-center text-gray-500 py-8 md:py-12">
+              <Calendar size={36} className="mx-auto mb-3 md:mb-4 opacity-50 md:w-12 md:h-12" />
+              <p className="text-sm md:text-base">최근 2주간 활동이 있는 딜이 없습니다</p>
             </div>
           ) : null}
         </div>
@@ -765,9 +773,9 @@ export default function DealSummaryPage() {
 
       {/* 데이터 없음 */}
       {(!data || data.pipelines.length === 0) && (
-        <div className="text-center text-gray-500 py-12 bg-white rounded-xl border border-gray-200">
-          <Target size={48} className="mx-auto mb-4 opacity-50" />
-          <p>거래 데이터가 없습니다</p>
+        <div className="text-center text-gray-500 py-8 md:py-12 bg-white rounded-xl border border-gray-200">
+          <Target size={36} className="mx-auto mb-3 md:mb-4 opacity-50 md:w-12 md:h-12" />
+          <p className="text-sm md:text-base">거래 데이터가 없습니다</p>
         </div>
       )}
     </div>
