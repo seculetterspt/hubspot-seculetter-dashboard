@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Use same domain for API calls (backend serves frontend)
-const API_BASE = '';
+// Backend API base URL - use environment variable or hardcode for Render
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://seculetter-hubspot-api.onrender.com';
 
 export interface SessionUser {
   email: string;
