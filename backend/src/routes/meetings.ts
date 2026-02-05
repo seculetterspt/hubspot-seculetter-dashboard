@@ -10,14 +10,13 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// 시큐레터 영업팀 이메일 목록 (config)
-const SALES_TEAM_EMAILS = [
-  'dongjin.jung@seculetter.com',
-  'jinwoo.han@seculetter.com',
-  'suu.shin@seculetter.com',
-  'yebin.jo@seculetter.com',
-  'young.yum@seculetter.com',
-];
+// 시큐레터 이메일 도메인 허용 (모든 @seculetter.com 사용자)
+const ALLOWED_EMAIL_DOMAIN = 'seculetter.com';
+
+const isAllowedEmail = (email: string) => {
+  if (!email) return false;
+  return email.toLowerCase().endsWith(`@${ALLOWED_EMAIL_DOMAIN}`);
+};
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -28,7 +27,7 @@ router.get('/owners', async (req: Request, res: Response) => {
   try {
     const ownersResponse = await hubspotClient.getOwners();
     const teamOwners = ownersResponse.results
-      .filter((o: any) => SALES_TEAM_EMAILS.includes(o.email?.toLowerCase()))
+      .filter((o: any) => isAllowedEmail(o.email))
       .map((o: any) => ({
         id: o.id,
         name: `${o.firstName || ''} ${o.lastName || ''}`.trim() || o.email,
