@@ -16,6 +16,7 @@ const SALES_TEAM_EMAILS = [
   'jinwoo.han@seculetter.com',
   'suu.shin@seculetter.com',
   'yebin.jo@seculetter.com',
+  'young.yum@seculetter.com',
 ];
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
