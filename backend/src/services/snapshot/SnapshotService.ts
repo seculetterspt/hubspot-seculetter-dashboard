@@ -319,28 +319,28 @@ class SnapshotService {
     };
   }
 
-  // 이전 주 월요일 스냅샷 조회 (비교용)
-  // 항상 "지난주 월요일" 스냅샷과 비교
-  // 예: 2/17(월)이면 2/10(월)과 비교, 2/19(수)이면 2/10(월)과 비교
+  // 이번주 월요일 스냅샷 조회 (비교용)
+  // 항상 "이번주 월요일" 스냅샷과 비교하여 주간 변화량 표시
+  // 예: 2/5(수)이면 2/2(월) 스냅샷과 비교, 2/9(월)이면 2/9(월) 스냅샷과 비교
   async getPreviousWeekSnapshot(pipelineId: string, targetYear: number): Promise<{ data: PipelineTotals; snapshotDate: string } | null> {
-    // 지난주 월요일 날짜 계산
-    const prevMonday = this.getPreviousMonday();
-    const prevMondayStr = prevMonday.toISOString().split('T')[0];
+    // 이번주 월요일 날짜 계산 (이번주 월요일 스냅샷과 비교)
+    const lastMonday = this.getLastMonday();
+    const lastMondayStr = lastMonday.toISOString().split('T')[0];
 
-    console.log(`[Snapshot] Looking for snapshot on or before previous Monday: ${prevMondayStr}`);
+    console.log(`[Snapshot] Looking for snapshot on or before this Monday: ${lastMondayStr}`);
 
-    // 지난주 월요일 또는 그 이전의 가장 최근 스냅샷 조회
+    // 이번주 월요일 또는 그 이전의 가장 최근 스냅샷 조회
     const result = await pool.query(
       `SELECT snapshot_date, total_amount, weighted_amount, open_amount, closed_won_amount, total_count
        FROM weekly_pipeline_snapshot
        WHERE pipeline_id = $1 AND target_year = $2 AND snapshot_date <= $3
        ORDER BY snapshot_date DESC
        LIMIT 1`,
-      [pipelineId, targetYear, prevMondayStr]
+      [pipelineId, targetYear, lastMondayStr]
     );
 
     if (result.rows.length === 0) {
-      console.log(`[Snapshot] No snapshot found on or before ${prevMondayStr}`);
+      console.log(`[Snapshot] No snapshot found on or before ${lastMondayStr}`);
       return null;
     }
 
