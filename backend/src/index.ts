@@ -59,7 +59,9 @@ app.use('/api/meetings', isAuthenticated, meetingsRouter);
 
 // 6. Static files (comes after auth routes)
 const publicPath = path.join(process.cwd(), 'public');
-app.use(express.static(publicPath));
+app.use(express.static(publicPath, {
+  index: false  // Don't serve index.html automatically from static middleware
+}));
 console.log('[Server] Serving static files from:', publicPath);
 
 // 7. Disable caching for HTML, JS, CSS files
