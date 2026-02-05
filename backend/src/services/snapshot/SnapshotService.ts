@@ -319,26 +319,33 @@ class SnapshotService {
     };
   }
 
-  // 이전 주 스냅샷 조회 (비교용)
-  // - 스냅샷이 1개면: 그 스냅샷 반환
-  // - 스냅샷이 2개 이상이면: 두 번째로 최신 스냅샷 반환 (이전 주)
+  // 이전 주 월요일 스냅샷 조회 (비교용)
+  // 항상 "지난주 월요일" 스냅샷과 비교
+  // 예: 2/17(월)이면 2/10(월)과 비교, 2/19(수)이면 2/10(월)과 비교
   async getPreviousWeekSnapshot(pipelineId: string, targetYear: number): Promise<{ data: PipelineTotals; snapshotDate: string } | null> {
-    // 최신 2개 스냅샷 조회
+    // 지난주 월요일 날짜 계산
+    const prevMonday = this.getPreviousMonday();
+    const prevMondayStr = prevMonday.toISOString().split('T')[0];
+
+    console.log(`[Snapshot] Looking for snapshot on or before previous Monday: ${prevMondayStr}`);
+
+    // 지난주 월요일 또는 그 이전의 가장 최근 스냅샷 조회
     const result = await pool.query(
       `SELECT snapshot_date, total_amount, weighted_amount, open_amount, closed_won_amount, total_count
        FROM weekly_pipeline_snapshot
-       WHERE pipeline_id = $1 AND target_year = $2
+       WHERE pipeline_id = $1 AND target_year = $2 AND snapshot_date <= $3
        ORDER BY snapshot_date DESC
-       LIMIT 2`,
-      [pipelineId, targetYear]
+       LIMIT 1`,
+      [pipelineId, targetYear, prevMondayStr]
     );
 
     if (result.rows.length === 0) {
+      console.log(`[Snapshot] No snapshot found on or before ${prevMondayStr}`);
       return null;
     }
 
-    // 스냅샷이 1개면 그것을 사용, 2개 이상이면 두 번째(이전 주) 사용
-    const row = result.rows.length === 1 ? result.rows[0] : result.rows[1];
+    const row = result.rows[0];
+    console.log(`[Snapshot] Found snapshot from: ${row.snapshot_date}`);
 
     return {
       data: {
