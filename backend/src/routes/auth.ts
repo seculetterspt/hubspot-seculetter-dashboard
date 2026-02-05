@@ -78,15 +78,19 @@ async function deleteOAuthState(state: string): Promise<void> {
  */
 router.get('/hubspot/login', async (req: Request, res: Response) => {
   try {
+    console.log('[OAuth] /auth/hubspot/login endpoint reached');
     // Generate random state for CSRF protection
     const state = crypto.randomBytes(16).toString('hex');
     const returnUrl = req.query.returnUrl as string || '/';
 
+    console.log('[OAuth] Saving state to database:', state);
     // Store state in database
     await saveOAuthState(state, returnUrl);
+    console.log('[OAuth] State saved successfully');
 
     // Redirect to HubSpot OAuth authorization URL
     const authUrl = oauthService.getAuthorizationUrl(state);
+    console.log('[OAuth] Redirecting to:', authUrl);
     res.redirect(authUrl);
   } catch (error) {
     console.error('[OAuth] Error in /auth/hubspot/login:', error);
