@@ -28,26 +28,11 @@ const sessionStore = new PostgresqlStore({
   tableName: 'session',
 });
 
-// Middleware
-// Serve static files from frontend build (relative to where npm start is run from)
-const publicPath = path.join(process.cwd(), 'public');
-app.use(express.static(publicPath));
+// IMPORTANT: Register middleware and routes in correct order
+// 1. Body parsing (must come before routes)
+app.use(express.json({ limit: '25mb' }));
 
-console.log('[Server] Serving static files from:', publicPath);
-
-// Disable caching for HTML, JS, CSS files to prevent stale code on other devices
-app.use((req, res, next) => {
-  if (req.path.endsWith('.html') || req.path.endsWith('.js') || req.path.endsWith('.css') || req.path === '/') {
-    res.set({
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    });
-  }
-  next();
-});
-
-// Session middleware
+// 2. Session middleware
 app.use(session({
   store: sessionStore,
   secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
@@ -61,18 +46,33 @@ app.use(session({
   },
 }));
 
-// Validate and touch session on each request
+// 3. Validate session
 app.use(validateSession);
 
-app.use(express.json({ limit: '25mb' }));
-
-// Auth routes (public)
+// 4. Auth routes (MUST come before static files to take precedence)
 app.use('/auth', authRouter);
 
-// Protected API routes (require authentication)
+// 5. Protected API routes
 app.use('/api/analytics', isAuthenticated, analyticsRouter);
 app.use('/api/snapshot', isAuthenticated, snapshotRouter);
 app.use('/api/meetings', isAuthenticated, meetingsRouter);
+
+// 6. Static files (comes after auth routes)
+const publicPath = path.join(process.cwd(), 'public');
+app.use(express.static(publicPath));
+console.log('[Server] Serving static files from:', publicPath);
+
+// 7. Disable caching for HTML, JS, CSS files
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') || req.path.endsWith('.js') || req.path.endsWith('.css') || req.path === '/') {
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+  }
+  next();
+});
 
 // Health check
 app.get('/health', (req, res) => {
