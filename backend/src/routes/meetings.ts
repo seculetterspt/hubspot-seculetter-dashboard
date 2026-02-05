@@ -3,6 +3,8 @@ import OpenAI from 'openai';
 import { toFile } from 'openai';
 import { hubspotClient } from '../services/hubspot/HubspotClient.js';
 import { pool } from '../config/database.js';
+import { transcribeLimiter, structureLimiter, saveLimiter } from '../middleware/rateLimit.js';
+import auditService from '../services/audit.js';
 
 const router = Router();
 
@@ -117,7 +119,7 @@ router.get('/scheduled', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────
 // Step 4: 음성 → 텍스트 변환 (OpenAI Whisper)
 // ─────────────────────────────────────────────
-router.post('/transcribe', async (req: Request, res: Response) => {
+router.post('/transcribe', transcribeLimiter, async (req: Request, res: Response) => {
   try {
     const { audio, mimeType } = req.body;
 
@@ -151,7 +153,7 @@ router.post('/transcribe', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────
 // Step 5: 트랜스크립트 → LLM 구조화
 // ─────────────────────────────────────────────
-router.post('/structure', async (req: Request, res: Response) => {
+router.post('/structure', structureLimiter, async (req: Request, res: Response) => {
   try {
     const { transcript, meetingContext, clarificationAnswers, manualMemo } = req.body;
 
@@ -336,7 +338,7 @@ JSON으로 응답:
 // ─────────────────────────────────────────────
 // Step 7: 최종 저장 (HubSpot 미팅 생성/업데이트)
 // ─────────────────────────────────────────────
-router.post('/save', async (req: Request, res: Response) => {
+router.post('/save', saveLimiter, async (req: Request, res: Response) => {
   try {
     const { structuredContent, associations, meetingId, ownerId } = req.body;
 
@@ -483,6 +485,29 @@ router.post('/save', async (req: Request, res: Response) => {
       console.warn(`[Save] Meeting ${resultMeetingId} saved but ${associationErrors.length} association(s) failed`);
     }
 
+    // Audit logging for write operation
+    try {
+      const userEmail = req.user?.email || 'unknown';
+      await auditService.log({
+        timestamp: new Date(),
+        userEmail,
+        actionType: meetingId ? 'update_meeting' : 'create_meeting',
+        targetId: resultMeetingId,
+        targetType: 'meeting',
+        status: 'success',
+        metadata: {
+          summary: structuredContent.summary_one_liner || '',
+          companiesCount: (allAssociations.companies || []).length,
+          dealsCount: (allAssociations.deals || []).length,
+          contactsCount: (allAssociations.contacts || []).length,
+          associationErrors: associationErrors.length,
+        },
+      });
+    } catch (auditErr: any) {
+      console.error('[Save] Audit logging failed:', auditErr.message);
+      // Don't throw - audit failure shouldn't block the response
+    }
+
     // 로컬 DB에 미팅 기록 저장 (추적용)
     try {
       if (process.env.DATABASE_URL) {
@@ -515,6 +540,21 @@ router.post('/save', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error saving meeting:', error);
+
+    // Audit logging for failure
+    try {
+      const userEmail = req.user?.email || 'unknown';
+      await auditService.log({
+        timestamp: new Date(),
+        userEmail,
+        actionType: 'save_meeting',
+        status: 'failure',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } catch (auditErr: any) {
+      console.error('[Save] Audit logging failed:', auditErr.message);
+    }
+
     res.status(500).json({ error: 'Failed to save meeting' });
   }
 });

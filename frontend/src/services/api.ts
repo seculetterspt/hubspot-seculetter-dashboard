@@ -1,12 +1,12 @@
 import axios from 'axios'
 
-const baseURL = import.meta.env.PROD
-  ? 'https://seculetter-hubspot-api.onrender.com/api'
-  : 'http://localhost:3001/api'
+// Use same domain for API calls (backend serves frontend)
+const baseURL = '/api'
 
 export const api = axios.create({
   baseURL,
   timeout: 120000, // 2분 타임아웃 (딜 그룹화 + AI 요약 생성 시간 고려)
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },

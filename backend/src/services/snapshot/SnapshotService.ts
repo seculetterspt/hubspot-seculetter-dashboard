@@ -319,26 +319,50 @@ class SnapshotService {
     };
   }
 
-  // 이전 주 스냅샷 조회 (비교용)
-  // - 스냅샷이 1개면: 그 스냅샷 반환
-  // - 스냅샷이 2개 이상이면: 두 번째로 최신 스냅샷 반환 (이전 주)
+  // 지난주 월요일 스냅샷 조회 (비교용)
+  // 항상 "지난주 월요일" 스냅샷과 비교하여 주간 변화량 표시
+  // 예: 2/9(월)이면 2/2(월) 스냅샷과 비교, 2/10(화)이면 2/2(월) 스냅샷과 비교
+  // 첫 주(지난주 스냅샷 없는 경우): 이번주 월요일 스냅샷으로 fallback
   async getPreviousWeekSnapshot(pipelineId: string, targetYear: number): Promise<{ data: PipelineTotals; snapshotDate: string } | null> {
-    // 최신 2개 스냅샷 조회
-    const result = await pool.query(
+    // 지난주 월요일 날짜 계산
+    const prevMonday = this.getPreviousMonday();
+    const prevMondayStr = prevMonday.toISOString().split('T')[0];
+
+    console.log(`[Snapshot] Looking for snapshot on or before previous Monday: ${prevMondayStr}`);
+
+    // 지난주 월요일 또는 그 이전의 가장 최근 스냅샷 조회
+    let result = await pool.query(
       `SELECT snapshot_date, total_amount, weighted_amount, open_amount, closed_won_amount, total_count
        FROM weekly_pipeline_snapshot
-       WHERE pipeline_id = $1 AND target_year = $2
+       WHERE pipeline_id = $1 AND target_year = $2 AND snapshot_date <= $3
        ORDER BY snapshot_date DESC
-       LIMIT 2`,
-      [pipelineId, targetYear]
+       LIMIT 1`,
+      [pipelineId, targetYear, prevMondayStr]
     );
 
+    // 지난주 스냅샷이 없으면 이번주 월요일 스냅샷으로 fallback (첫 주 대응)
     if (result.rows.length === 0) {
+      const lastMonday = this.getLastMonday();
+      const lastMondayStr = lastMonday.toISOString().split('T')[0];
+      console.log(`[Snapshot] No previous Monday snapshot, falling back to this Monday: ${lastMondayStr}`);
+
+      result = await pool.query(
+        `SELECT snapshot_date, total_amount, weighted_amount, open_amount, closed_won_amount, total_count
+         FROM weekly_pipeline_snapshot
+         WHERE pipeline_id = $1 AND target_year = $2 AND snapshot_date <= $3
+         ORDER BY snapshot_date DESC
+         LIMIT 1`,
+        [pipelineId, targetYear, lastMondayStr]
+      );
+    }
+
+    if (result.rows.length === 0) {
+      console.log(`[Snapshot] No snapshot found`);
       return null;
     }
 
-    // 스냅샷이 1개면 그것을 사용, 2개 이상이면 두 번째(이전 주) 사용
-    const row = result.rows.length === 1 ? result.rows[0] : result.rows[1];
+    const row = result.rows[0];
+    console.log(`[Snapshot] Found snapshot from: ${row.snapshot_date}`);
 
     return {
       data: {
