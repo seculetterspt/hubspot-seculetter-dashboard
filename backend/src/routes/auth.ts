@@ -4,6 +4,7 @@ import session from 'express-session';
 import { sign as signCookie } from 'cookie-signature';
 import { HubSpotOAuthService } from '../services/oauth.js';
 import { isEmailAllowed } from '../middleware/allowlist.js';
+import { pool } from '../config/database.js';
 
 declare module 'express-session' {
   interface SessionData {
@@ -20,18 +21,53 @@ const router = Router();
 const oauthService = new HubSpotOAuthService();
 
 /**
- * Store OAuth states in memory (in production, use Redis or database)
- * Expires after 10 minutes
+ * Store OAuth state in database with 10-minute expiry
  */
-const oauthStates = new Map<string, { timestamp: number; returnUrl?: string }>();
+async function saveOAuthState(state: string, returnUrl?: string): Promise<void> {
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  try {
+    await pool.query(
+      'INSERT INTO "oauth_state" (state, return_url, expires_at) VALUES ($1, $2, $3)',
+      [state, returnUrl || '/', expiresAt]
+    );
+  } catch (error) {
+    console.error('[OAuth] Failed to save state to database:', error);
+    throw error;
+  }
+}
 
-function cleanupOldStates() {
-  const now = Date.now();
-  const tenMinutes = 10 * 60 * 1000;
-  for (const [state, data] of oauthStates.entries()) {
-    if (now - data.timestamp > tenMinutes) {
-      oauthStates.delete(state);
+async function getOAuthState(state: string): Promise<{ returnUrl: string } | null> {
+  try {
+    const result = await pool.query(
+      'SELECT return_url, expires_at FROM "oauth_state" WHERE state = $1',
+      [state]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
     }
+
+    const row = result.rows[0];
+
+    // Check if expired
+    if (new Date(row.expires_at) < new Date()) {
+      // Delete expired state
+      await deleteOAuthState(state);
+      return null;
+    }
+
+    return { returnUrl: row.return_url };
+  } catch (error) {
+    console.error('[OAuth] Failed to get state from database:', error);
+    return null;
+  }
+}
+
+async function deleteOAuthState(state: string): Promise<void> {
+  try {
+    await pool.query('DELETE FROM "oauth_state" WHERE state = $1', [state]);
+  } catch (error) {
+    console.error('[OAuth] Failed to delete state from database:', error);
   }
 }
 
@@ -40,28 +76,20 @@ function cleanupOldStates() {
  * Redirects user to HubSpot OAuth authorization page
  * Optional query param: ?returnUrl=/path/to/redirect
  */
-router.get('/hubspot/login', (req: Request, res: Response) => {
+router.get('/hubspot/login', async (req: Request, res: Response) => {
   try {
     // Generate random state for CSRF protection
     const state = crypto.randomBytes(16).toString('hex');
     const returnUrl = req.query.returnUrl as string || '/';
 
-    // Store state with expiry
-    oauthStates.set(state, {
-      timestamp: Date.now(),
-      returnUrl,
-    });
-
-    // Cleanup old states periodically
-    if (Math.random() < 0.1) {
-      cleanupOldStates();
-    }
+    // Store state in database
+    await saveOAuthState(state, returnUrl);
 
     // Redirect to HubSpot OAuth authorization URL
     const authUrl = oauthService.getAuthorizationUrl(state);
     res.redirect(authUrl);
   } catch (error) {
-    console.error('Error in /auth/hubspot/login:', error);
+    console.error('[OAuth] Error in /auth/hubspot/login:', error);
     res.status(500).json({
       error: 'Authentication failed',
       message: 'Failed to initiate HubSpot login. Please try again.',
@@ -85,16 +113,25 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
     }
 
     // Validate state for CSRF protection
-    if (!state || !oauthStates.has(state as string)) {
-      console.error('[OAuth] Invalid state');
+    if (!state) {
+      console.error('[OAuth] Missing state parameter');
       return res.status(400).json({
         error: 'Invalid state',
         message: 'OAuth state validation failed. Please try logging in again.',
       });
     }
 
-    const stateData = oauthStates.get(state as string)!;
-    oauthStates.delete(state as string);
+    const stateData = await getOAuthState(state as string);
+    if (!stateData) {
+      console.error('[OAuth] Invalid or expired state');
+      return res.status(400).json({
+        error: 'Invalid state',
+        message: 'OAuth state validation failed. Please try logging in again.',
+      });
+    }
+
+    // Delete the state after use
+    await deleteOAuthState(state as string);
 
     if (!code) {
       return res.status(400).json({
@@ -163,7 +200,7 @@ router.get('/hubspot/callback', async (req: Request, res: Response) => {
 
       // Redirect to frontend
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const returnUrl = stateData.returnUrl || '/';
+      const returnUrl = stateData?.returnUrl || '/';
       const redirectUrl = `${frontendUrl}${returnUrl}`;
 
       res.redirect(redirectUrl);

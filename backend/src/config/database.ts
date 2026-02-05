@@ -327,6 +327,16 @@ export async function initDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS IDX_audit_logs_user_email ON "audit_logs" ("user_email");
       CREATE INDEX IF NOT EXISTS IDX_audit_logs_timestamp ON "audit_logs" ("timestamp" DESC);
       CREATE INDEX IF NOT EXISTS IDX_audit_logs_action_type ON "audit_logs" ("action_type");
+
+      -- OAuth state storage (for CSRF protection)
+      CREATE TABLE IF NOT EXISTS "oauth_state" (
+        "state" varchar NOT NULL UNIQUE PRIMARY KEY,
+        "return_url" varchar,
+        "created_at" timestamp DEFAULT CURRENT_TIMESTAMP,
+        "expires_at" timestamp NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS IDX_oauth_state_expires ON "oauth_state" ("expires_at");
     `);
     console.log('Database initialized successfully');
   } finally {
