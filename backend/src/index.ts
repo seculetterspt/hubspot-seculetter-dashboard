@@ -104,8 +104,12 @@ app.get('/api', (req, res) => {
   });
 });
 
-// SPA fallback: serve index.html for all non-API routes
+// SPA fallback: serve index.html for non-API/non-auth routes
 app.get('*', (req, res) => {
+  // Don't serve SPA for API, auth, or health check routes
+  if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path === '/health') {
+    return res.status(404).json({ error: 'Not found' });
+  }
   res.sendFile(path.join(publicPath, 'index.html'));
 });
 
