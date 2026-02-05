@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import AuthorSelectStep from '../components/meeting/AuthorSelectStep'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
+import { api } from '../services/api'
+import { Loader2 } from 'lucide-react'
 import MeetingSelectStep from '../components/meeting/MeetingSelectStep'
 import MeetingDetailStep from '../components/meeting/MeetingDetailStep'
 import VoiceRecordStep from '../components/meeting/VoiceRecordStep'
@@ -48,7 +51,7 @@ const INITIAL_DATA: MeetingFlowData = {
 }
 
 type Step =
-  | 'author'
+  | 'loading'
   | 'meeting-select'
   | 'meeting-detail'
   | 'record'
@@ -58,24 +61,71 @@ type Step =
   | 'final-review'
 
 export default function MeetingLogPage() {
-  const [step, setStep] = useState<Step>('author')
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [step, setStep] = useState<Step>('loading')
   const [data, setData] = useState<MeetingFlowData>(INITIAL_DATA)
+  const [error, setError] = useState<string | null>(null)
 
   const updateData = (updates: Partial<MeetingFlowData>) => {
     setData(prev => ({ ...prev, ...updates }))
   }
 
-  switch (step) {
-    case 'author':
-      return (
-        <AuthorSelectStep
-          onSelect={(owner) => {
-            updateData({ owner })
-            setStep('meeting-select')
-          }}
-        />
-      )
+  // Auto-lookup HubSpot owner by logged-in user's email
+  useEffect(() => {
+    const fetchOwner = async () => {
+      if (!user?.email) return
 
+      try {
+        const res = await api.get('/meetings/owners')
+        const owners = res.data.owners || []
+        const matchedOwner = owners.find(
+          (o: { email: string }) => o.email.toLowerCase() === user.email.toLowerCase()
+        )
+
+        if (matchedOwner) {
+          updateData({ owner: matchedOwner })
+          setStep('meeting-select')
+        } else {
+          // User email not found in HubSpot owners - show error
+          setError(`등록된 HubSpot 사용자가 아닙니다: ${user.email}`)
+        }
+      } catch (err) {
+        console.error('Failed to fetch owners:', err)
+        setError('HubSpot 사용자 정보를 불러오지 못했습니다')
+      }
+    }
+
+    fetchOwner()
+  }, [user?.email])
+
+  // Loading state while fetching owner
+  if (step === 'loading') {
+    if (error) {
+      return (
+        <div className="max-w-lg mx-auto flex flex-col items-center justify-center min-h-[50vh] px-4">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
+            <p className="text-red-700 font-medium mb-4">{error}</p>
+            <button
+              onClick={() => navigate('/')}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200"
+            >
+              타임라인으로 돌아가기
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh]">
+        <Loader2 size={32} className="animate-spin text-primary-600 mb-3" />
+        <p className="text-gray-500">사용자 정보 확인 중...</p>
+      </div>
+    )
+  }
+
+  switch (step) {
     case 'meeting-select':
       return (
         <MeetingSelectStep
@@ -91,7 +141,7 @@ export default function MeetingLogPage() {
             })
             setStep('record')
           }}
-          onBack={() => setStep('author')}
+          onBack={() => navigate('/')}
         />
       )
 
@@ -134,7 +184,7 @@ export default function MeetingLogPage() {
           onRetry={() => setStep('record')}
           onCancel={() => {
             setData(INITIAL_DATA)
-            setStep('author')
+            navigate('/')
           }}
         />
       )
@@ -176,5 +226,8 @@ export default function MeetingLogPage() {
           onBack={() => setStep('hubspot-link')}
         />
       )
+
+    default:
+      return null
   }
 }
