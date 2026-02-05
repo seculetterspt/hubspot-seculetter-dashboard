@@ -2,6 +2,7 @@ import axios from 'axios';
 
 interface HubSpotOAuthTokenResponse {
   access_token: string;
+  refresh_token?: string;
   expires_in: number;
   token_type: string;
 }
@@ -12,7 +13,17 @@ interface HubSpotUserInfo {
   portalId?: string;
 }
 
-const HUBSPOT_AUTH_BASE = 'https://app-na2.hubspot.com';
+interface HubSpotAccessTokenInfo {
+  user: string;        // User email
+  user_id: number;     // User ID
+  hub_id: number;      // Portal ID
+  app_id: number;
+  expires_in: number;
+  token_type: string;
+  scopes: string[];
+}
+
+const HUBSPOT_AUTH_BASE = 'https://app.hubspot.com';
 const HUBSPOT_API_BASE = 'https://api.hubapi.com';
 const HUBSPOT_OAUTH_TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token';
 
@@ -101,44 +112,51 @@ export class HubSpotOAuthService {
   }
 
   /**
-   * Fetch user info from HubSpot using OAuth token
-   * For identity verification purposes
+   * Fetch user info from HubSpot using OAuth access token
+   * Uses the access token info endpoint to get the authenticated user's email
    * IMPORTANT: This token is ONLY used for identity verification, then discarded
    */
   async getUserInfo(accessToken: string): Promise<HubSpotUserInfo> {
     this.validateConfig();
     try {
-      // Fetch the authenticated user's information using the OAuth token
-      const response = await axios.get(
-        `${HUBSPOT_API_BASE}/oauth/v1/user`,
+      // Use HubSpot's access token info endpoint to get user details
+      // This endpoint returns the email of the user who authorized the token
+      const response = await axios.get<HubSpotAccessTokenInfo>(
+        `${HUBSPOT_API_BASE}/oauth/v1/access-tokens/${accessToken}`,
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            'Accept': 'application/json',
           },
         }
       );
 
-      const userData = response.data;
-      return {
-        email: userData.user?.email || userData.email || 'unknown@hubspot.local',
-        name: userData.user?.name || userData.name || 'HubSpot User',
-        portalId: userData.hub_id || userData.hubId,
-      };
+      const tokenInfo = response.data;
+      console.log('[OAuth] Token info retrieved:', {
+        user: tokenInfo.user,
+        user_id: tokenInfo.user_id,
+        hub_id: tokenInfo.hub_id,
+      });
+
+      // The 'user' field contains the email of the HubSpot user who authorized the app
+      if (tokenInfo.user) {
+        return {
+          email: tokenInfo.user,
+          name: tokenInfo.user.split('@')[0], // Use email prefix as name fallback
+          portalId: String(tokenInfo.hub_id),
+        };
+      }
+
+      throw new Error('No user email found in token info');
     } catch (error: any) {
-      console.error('Error fetching user info from token:', {
+      console.error('[OAuth] Error fetching user info from access token:', {
         status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
         message: error.message,
       });
 
-      // Fallback: create a unique user identifier
-      // This allows OAuth to work even if we can't fetch specific user details
-      const uniqueId = Buffer.from(accessToken).toString('base64').substring(0, 12);
-
-      return {
-        email: `oauth-user+${uniqueId}@seculetter.local`,
-        name: 'HubSpot OAuth User',
-        portalId: undefined,
-      };
+      // Don't use fallback - fail explicitly so we know there's an issue
+      throw new Error('Failed to fetch user identity from HubSpot');
     }
   }
 }
