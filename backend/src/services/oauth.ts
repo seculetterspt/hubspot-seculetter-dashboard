@@ -108,29 +108,21 @@ export class HubSpotOAuthService {
   async getUserInfo(accessToken: string): Promise<HubSpotUserInfo> {
     this.validateConfig();
     try {
-      // Try to use the token to access a simple endpoint to verify it works
-      // and extract any available user information
+      // Fetch the authenticated user's information using the OAuth token
       const response = await axios.get(
-        `${HUBSPOT_API_BASE}/crm/v3/objects/contacts`,
+        `${HUBSPOT_API_BASE}/oauth/v1/user`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
-          params: {
-            limit: 1,
-            properties: ['firstname', 'lastname', 'email'],
-          },
         }
       );
 
-      // If we can access the API, the token is valid
-      // For now, use a placeholder email based on the HubSpot account
-      // In production, you would want to implement proper user identification
-
+      const userData = response.data;
       return {
-        email: `user+${this.clientId.substring(0, 8)}@hubspot.local`,
-        name: 'HubSpot User',
-        portalId: undefined,
+        email: userData.user?.email || userData.email || 'unknown@hubspot.local',
+        name: userData.user?.name || userData.name || 'HubSpot User',
+        portalId: userData.hub_id || userData.hubId,
       };
     } catch (error: any) {
       console.error('Error fetching user info from token:', {
