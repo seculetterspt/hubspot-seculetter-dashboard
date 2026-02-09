@@ -74,24 +74,37 @@ export default function MeetingLogPage() {
   // Auto-lookup HubSpot owner by logged-in user's email
   useEffect(() => {
     const fetchOwner = async () => {
-      if (!user?.email) return
+      console.log('[MeetingLogPage] fetchOwner called, user:', user)
+      console.log('[MeetingLogPage] user.email:', user?.email)
+
+      if (!user?.email) {
+        console.log('[MeetingLogPage] No user email, returning early')
+        return
+      }
 
       try {
+        console.log('[MeetingLogPage] Fetching owners...')
         const res = await api.get('/meetings/owners')
         const owners = res.data.owners || []
+        console.log('[MeetingLogPage] Owners fetched:', owners.length, 'owners')
+        console.log('[MeetingLogPage] Looking for email:', user.email.toLowerCase())
+
         const matchedOwner = owners.find(
           (o: { email: string }) => o.email.toLowerCase() === user.email.toLowerCase()
         )
+        console.log('[MeetingLogPage] Matched owner:', matchedOwner)
 
         if (matchedOwner) {
+          console.log('[MeetingLogPage] Setting owner and step to meeting-select')
           updateData({ owner: matchedOwner })
           setStep('meeting-select')
         } else {
           // User email not found in HubSpot owners - show error
+          console.log('[MeetingLogPage] No matched owner, showing error')
           setError(`등록된 HubSpot 사용자가 아닙니다: ${user.email}`)
         }
       } catch (err) {
-        console.error('Failed to fetch owners:', err)
+        console.error('[MeetingLogPage] Failed to fetch owners:', err)
         setError('HubSpot 사용자 정보를 불러오지 못했습니다')
       }
     }
@@ -100,12 +113,15 @@ export default function MeetingLogPage() {
   }, [user?.email])
 
   // Loading state while fetching owner
+  console.log('[MeetingLogPage] Render - step:', step, 'user:', user?.email, 'error:', error)
+
   if (step === 'loading') {
     if (error) {
       return (
         <div className="max-w-lg mx-auto flex flex-col items-center justify-center min-h-[50vh] px-4">
           <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
             <p className="text-red-700 font-medium mb-4">{error}</p>
+            <p className="text-xs text-gray-500 mb-4">[DEBUG] step: {step}, user: {user?.email || 'none'}</p>
             <button
               onClick={() => navigate('/')}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200"
@@ -121,6 +137,7 @@ export default function MeetingLogPage() {
       <div className="flex flex-col items-center justify-center min-h-[50vh]">
         <Loader2 size={32} className="animate-spin text-primary-600 mb-3" />
         <p className="text-gray-500">사용자 정보 확인 중...</p>
+        <p className="text-xs text-gray-400 mt-2">[DEBUG] step: {step}, user: {user?.email || 'loading...'}</p>
       </div>
     )
   }
