@@ -284,15 +284,76 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
     const activities: ActivityItem[] = [];
     const emptyAssociations = { companies: [], contacts: [], deals: [] };
 
+    // HubSpot Search API를 사용하여 날짜 범위 내 활동을 서버사이드 필터링 + 페이지네이션
+    // 검색 API로 활동 조회하는 헬퍼 함수 (페이지네이션 지원)
+    const searchActivities = async (
+      objectType: string,
+      timestampProperty: string,
+      properties: string[],
+      maxResults: number = 200
+    ): Promise<any[]> => {
+      const allResults: any[] = [];
+      let after: string | undefined = undefined;
+      let retryCount = 0;
+      const maxRetries = 3;
+
+      do {
+        try {
+          const searchRequest: any = {
+            filterGroups: [{
+              filters: [
+                {
+                  propertyName: timestampProperty,
+                  operator: 'GTE',
+                  value: fromDate.getTime().toString()
+                },
+                {
+                  propertyName: timestampProperty,
+                  operator: 'LTE',
+                  value: toDate.getTime().toString()
+                }
+              ]
+            }],
+            sorts: [{ propertyName: timestampProperty, direction: 'DESCENDING' }],
+            properties,
+            limit: 100,
+            after: after || '0'
+          };
+
+          const response = await hubspotClient.api.crm.objects.searchApi.doSearch(
+            objectType,
+            searchRequest
+          );
+          allResults.push(...response.results);
+          after = response.paging?.next?.after;
+          retryCount = 0;
+
+          if (allResults.length >= maxResults) break;
+          if (after) await delay(300);
+        } catch (e: any) {
+          if (e.code === 429 && retryCount < maxRetries) {
+            retryCount++;
+            console.log(`[Activity Search] Rate limit for ${objectType}, waiting ${retryCount * 2}s...`);
+            await delay(retryCount * 2000);
+            continue;
+          }
+          throw e;
+        }
+      } while (after);
+
+      return allResults;
+    };
+
     // 전화 조회
     try {
-      const callsRes = await hubspotClient.getCalls(100);
-      const filteredCalls = callsRes.results.filter(c => {
-        const timestamp = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
-        return timestamp && timestamp >= fromDate && timestamp <= toDate;
-      });
+      const calls = await searchActivities(
+        'calls',
+        'hs_timestamp',
+        ['hs_call_title', 'hs_call_body', 'hs_call_duration', 'hs_call_status', 'hs_call_direction', 'hs_call_disposition', 'hs_timestamp', 'hubspot_owner_id']
+      );
+      console.log(`[Activity Search] Calls found: ${calls.length}`);
 
-      for (const call of filteredCalls) {
+      for (const call of calls) {
         const timestamp = call.properties.hs_timestamp || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
 
@@ -309,17 +370,36 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       }
     } catch (error) {
       console.error('Error fetching calls for timeline:', error);
+      // fallback: 기존 getPage 방식
+      try {
+        const callsRes = await hubspotClient.getCalls(100);
+        const filteredCalls = callsRes.results.filter(c => {
+          const ts = c.properties.hs_timestamp ? new Date(c.properties.hs_timestamp) : null;
+          return ts && ts >= fromDate && ts <= toDate;
+        });
+        for (const call of filteredCalls) {
+          const timestamp = call.properties.hs_timestamp || '';
+          const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
+          activities.push({ id: call.id, type: 'call', title: call.properties.hs_call_title || '(제목 없음)', body: call.properties.hs_call_body || '', timestamp, date, associations: emptyAssociations, comments: [] });
+        }
+        console.log(`[Activity Search] Calls fallback: ${filteredCalls.length}`);
+      } catch (fallbackErr) {
+        console.error('Error fetching calls (fallback):', fallbackErr);
+      }
     }
+
+    await delay(300);
 
     // 메모 조회
     try {
-      const notesRes = await hubspotClient.getNotes(100);
-      const filteredNotes = notesRes.results.filter(n => {
-        const timestamp = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
-        return timestamp && timestamp >= fromDate && timestamp <= toDate;
-      });
+      const notes = await searchActivities(
+        'notes',
+        'hs_timestamp',
+        ['hs_note_body', 'hs_timestamp', 'hubspot_owner_id']
+      );
+      console.log(`[Activity Search] Notes found: ${notes.length}`);
 
-      for (const note of filteredNotes) {
+      for (const note of notes) {
         const timestamp = note.properties.hs_timestamp || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
 
@@ -336,17 +416,36 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       }
     } catch (error) {
       console.error('Error fetching notes for timeline:', error);
+      // fallback: 기존 getPage 방식
+      try {
+        const notesRes = await hubspotClient.getNotes(100);
+        const filteredNotes = notesRes.results.filter(n => {
+          const ts = n.properties.hs_timestamp ? new Date(n.properties.hs_timestamp) : null;
+          return ts && ts >= fromDate && ts <= toDate;
+        });
+        for (const note of filteredNotes) {
+          const timestamp = note.properties.hs_timestamp || '';
+          const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
+          activities.push({ id: note.id, type: 'note', title: '메모', body: note.properties.hs_note_body || '', timestamp, date, associations: emptyAssociations, comments: [] });
+        }
+        console.log(`[Activity Search] Notes fallback: ${filteredNotes.length}`);
+      } catch (fallbackErr) {
+        console.error('Error fetching notes (fallback):', fallbackErr);
+      }
     }
+
+    await delay(300);
 
     // 미팅 조회 (예정된 미팅 포함)
     try {
-      const meetingsRes = await hubspotClient.getMeetings(100);
-      const filteredMeetings = meetingsRes.results.filter(m => {
-        const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
-        return startTime && startTime >= fromDate && startTime <= toDate;
-      });
+      const meetings = await searchActivities(
+        'meetings',
+        'hs_meeting_start_time',
+        ['hs_meeting_title', 'hs_meeting_body', 'hs_meeting_start_time', 'hs_meeting_end_time', 'hs_meeting_outcome', 'hs_meeting_location', 'hubspot_owner_id', 'hs_timestamp', 'hs_internal_meeting_notes']
+      );
+      console.log(`[Activity Search] Meetings found: ${meetings.length}`);
 
-      for (const meeting of filteredMeetings) {
+      for (const meeting of meetings) {
         const timestamp = meeting.properties.hs_meeting_start_time || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
 
@@ -370,22 +469,39 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       }
     } catch (error) {
       console.error('Error fetching meetings for timeline:', error);
+      // fallback: 기존 getPage 방식
+      try {
+        const meetingsRes = await hubspotClient.getMeetings(100);
+        const filteredMeetings = meetingsRes.results.filter(m => {
+          const startTime = m.properties.hs_meeting_start_time ? new Date(m.properties.hs_meeting_start_time) : null;
+          return startTime && startTime >= fromDate && startTime <= toDate;
+        });
+        for (const meeting of filteredMeetings) {
+          const timestamp = meeting.properties.hs_meeting_start_time || '';
+          const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
+          const meetingBody = meeting.properties.hs_meeting_body || '';
+          const internalNotes = meeting.properties.hs_internal_meeting_notes || '';
+          const combinedBody = internalNotes ? `${meetingBody}\n\n[내부 노트]\n${internalNotes}` : meetingBody;
+          activities.push({ id: meeting.id, type: 'meeting', title: meeting.properties.hs_meeting_title || '(제목 없음)', body: combinedBody || '', timestamp, date, associations: emptyAssociations, comments: [] });
+        }
+        console.log(`[Activity Search] Meetings fallback: ${filteredMeetings.length}`);
+      } catch (fallbackErr) {
+        console.error('Error fetching meetings (fallback):', fallbackErr);
+      }
     }
+
+    await delay(300);
 
     // 이메일 조회 (scope 미승인시 조용히 무시)
     try {
-      const emailsRes = await hubspotClient.api.crm.objects.basicApi.getPage(
+      const emails = await searchActivities(
         'emails',
-        100,
-        undefined,
+        'hs_timestamp',
         ['hs_email_subject', 'hs_email_text', 'hs_email_direction', 'hs_timestamp']
       );
-      const filteredEmails = emailsRes.results.filter(e => {
-        const timestamp = e.properties.hs_timestamp ? new Date(e.properties.hs_timestamp) : null;
-        return timestamp && timestamp >= fromDate && timestamp <= toDate;
-      });
+      console.log(`[Activity Search] Emails found: ${emails.length}`);
 
-      for (const email of filteredEmails) {
+      for (const email of emails) {
         const timestamp = email.properties.hs_timestamp || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
 
@@ -406,6 +522,8 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
         console.error('Error fetching emails for timeline:', error);
       }
     }
+
+    console.log(`[Activity Search] Total activities found: ${activities.length}`);
 
     // Association 및 댓글 조회 (선택적, generateSummaries 요청 시에만)
     const shouldFetchAssociations = req.query.includeAssociations === 'true' || generateSummaries === 'true';
@@ -550,7 +668,9 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           pipeline: deal.properties.pipeline,
           stage: deal.properties.dealstage,
           stageName: stageMap.get(deal.properties.dealstage) || deal.properties.dealstage,
-          closeDate: deal.properties.closedate
+          closeDate: deal.properties.closedate,
+          lastModified: deal.properties.hs_lastmodifieddate,
+          notesLastUpdated: deal.properties.notes_last_updated
         });
       });
 
@@ -605,6 +725,49 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       });
 
       console.log(`[Deal Grouping] Matched: ${matchedCount}, Unmatched (filtered out): ${unmatchedCount}`);
+
+      // 최근 수정된 딜도 포함 (활동 객체가 없더라도 딜 속성이 변경된 경우)
+      let recentlyModifiedCount = 0;
+      dealMap.forEach((deal, dealId) => {
+        if (dealActivityMap.has(dealId)) return; // 이미 활동이 있는 딜은 제외
+
+        const lastModified = deal.lastModified ? new Date(deal.lastModified) : null;
+        const notesUpdated = deal.notesLastUpdated ? new Date(deal.notesLastUpdated) : null;
+
+        // 최근 수정 날짜가 검색 범위 내인지 확인
+        const isRecentlyModified = lastModified && lastModified >= fromDate && lastModified <= toDate;
+        const hasRecentNotes = notesUpdated && notesUpdated >= fromDate && notesUpdated <= toDate;
+
+        if (isRecentlyModified || hasRecentNotes) {
+          const activityDate = (notesUpdated && notesUpdated >= fromDate) ? notesUpdated : lastModified;
+          const dateStr = activityDate ? activityDate.toISOString().split('T')[0] : '';
+
+          // 딜 속성 변경을 가상 활동으로 추가
+          const virtualActivity: ActivityItem = {
+            id: `deal-update-${dealId}`,
+            type: 'note',
+            title: '딜 업데이트',
+            body: `딜 속성이 업데이트되었습니다. (${dateStr})`,
+            timestamp: activityDate?.toISOString() || '',
+            date: dateStr,
+            associations: {
+              companies: [],
+              contacts: [],
+              deals: [{ id: dealId, name: deal.name }]
+            },
+            comments: []
+          };
+
+          dealActivityMap.set(dealId, {
+            deal,
+            activities: [virtualActivity],
+            companyName: ''
+          });
+          recentlyModifiedCount++;
+        }
+      });
+
+      console.log(`[Deal Grouping] Recently modified deals added: ${recentlyModifiedCount}`);
 
       // 최근 활동 순으로 정렬
       const sortedDealActivities = Array.from(dealActivityMap.values())
