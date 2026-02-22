@@ -732,8 +732,12 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
         });
       });
 
+      // 파이프라인 라벨 확인을 위한 로그
+      const pipelineLabel = pipelineId
+        ? pipelines.results.find((p: any) => p.id === pipelineId)?.label || 'unknown'
+        : 'all';
       console.log(`[Deal Grouping] Total deals: ${allDeals.length}, Filtered deals: ${dealMap.size}`);
-      console.log(`[Deal Grouping] Target year: ${targetYear}, Pipeline: ${pipelineId || 'all'}`);
+      console.log(`[Deal Grouping] Target year: ${targetYear}, Pipeline: ${pipelineId || 'all'} (${pipelineLabel})`);
 
       // 활동에서 딜 연결 확인
       const activitiesWithDeals = activities.filter(a => a.associations.deals.length > 0);
@@ -759,23 +763,32 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
 
       activities.forEach(activity => {
         if (activity.associations.deals.length > 0) {
-          // dealId를 문자열로 변환하여 매칭 (타입 불일치 방지)
-          const dealId = String(activity.associations.deals[0].id);
-          const deal = dealMap.get(dealId);
-          if (deal) {
+          // 활동에 연결된 모든 딜을 순회하며, 현재 파이프라인에 해당하는 딜만 매칭
+          // (기존: deals[0]만 확인 → 다른 파이프라인 딜이 첫 번째로 오면 잘못된 결과 발생)
+          let matched = false;
+          for (const assocDeal of activity.associations.deals) {
+            const dealId = String(assocDeal.id);
+            const deal = dealMap.get(dealId);
+            if (deal) {
+              matched = true;
+              if (!dealActivityMap.has(dealId)) {
+                dealActivityMap.set(dealId, {
+                  deal,
+                  activities: [],
+                  companyName: activity.associations.companies[0]?.name || ''
+                });
+              }
+              const entry = dealActivityMap.get(dealId)!;
+              entry.activities.push(activity);
+              if (!entry.companyName && activity.associations.companies[0]?.name) {
+                entry.companyName = activity.associations.companies[0].name;
+              }
+              // 파이프라인 필터가 있으면 첫 매칭 딜만 사용 (중복 방지)
+              if (pipelineId) break;
+            }
+          }
+          if (matched) {
             matchedCount++;
-            if (!dealActivityMap.has(dealId)) {
-              dealActivityMap.set(dealId, {
-                deal,
-                activities: [],
-                companyName: activity.associations.companies[0]?.name || ''
-              });
-            }
-            const entry = dealActivityMap.get(dealId)!;
-            entry.activities.push(activity);
-            if (!entry.companyName && activity.associations.companies[0]?.name) {
-              entry.companyName = activity.associations.companies[0].name;
-            }
           } else {
             unmatchedCount++;
           }
