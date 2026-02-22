@@ -297,6 +297,130 @@ export class HubspotClient {
       throw error;
     }
   }
+
+  // Search companies by name (for mobile meeting log autocomplete)
+  async searchCompanies(query: string, limit = 5): Promise<{ id: string; name: string }[]> {
+    try {
+      const response = await this.client.crm.companies.searchApi.doSearch({
+        query,
+        limit,
+        properties: ['name'],
+        filterGroups: [],
+        sorts: [],
+        after: '0',
+      });
+      return response.results.map(c => ({
+        id: c.id,
+        name: c.properties.name || '(회사명 없음)',
+      }));
+    } catch (error) {
+      console.error('Error searching companies:', error);
+      return [];
+    }
+  }
+
+  // Search contacts by name (for mobile meeting log autocomplete)
+  async searchContacts(query: string, limit = 5): Promise<{ id: string; name: string; email?: string }[]> {
+    try {
+      const response = await this.client.crm.contacts.searchApi.doSearch({
+        query,
+        limit,
+        properties: ['firstname', 'lastname', 'email'],
+        filterGroups: [],
+        sorts: [],
+        after: '0',
+      });
+      return response.results.map(c => ({
+        id: c.id,
+        name: `${c.properties.firstname || ''} ${c.properties.lastname || ''}`.trim() || c.properties.email || '(이름 없음)',
+        email: c.properties.email || undefined,
+      }));
+    } catch (error) {
+      console.error('Error searching contacts:', error);
+      return [];
+    }
+  }
+
+  // Search deals by name (for mobile meeting log autocomplete)
+  async searchDeals(query: string, limit = 5): Promise<{ id: string; name: string; companyName?: string }[]> {
+    try {
+      const response = await this.client.crm.deals.searchApi.doSearch({
+        query,
+        limit,
+        properties: ['dealname'],
+        filterGroups: [],
+        sorts: [],
+        after: '0',
+      });
+      return response.results.map(d => ({
+        id: d.id,
+        name: d.properties.dealname || '(거래명 없음)',
+      }));
+    } catch (error) {
+      console.error('Error searching deals:', error);
+      return [];
+    }
+  }
+
+  // Get a single meeting by ID
+  async getMeetingById(meetingId: string) {
+    try {
+      const response = await this.client.crm.objects.basicApi.getById(
+        'meetings',
+        meetingId,
+        ['hs_meeting_title', 'hs_meeting_body', 'hs_meeting_start_time', 'hs_meeting_end_time', 'hs_meeting_outcome', 'hs_internal_meeting_notes']
+      );
+      return response;
+    } catch (error) {
+      console.error('Error fetching meeting by ID:', error);
+      throw error;
+    }
+  }
+
+  // Update a meeting object in HubSpot
+  async updateMeeting(meetingId: string, properties: Record<string, string>) {
+    try {
+      const response = await this.client.crm.objects.basicApi.update('meetings', meetingId, {
+        properties,
+      });
+      return response;
+    } catch (error) {
+      console.error('Error updating meeting:', error);
+      throw error;
+    }
+  }
+
+  // Create a meeting object in HubSpot
+  async createMeeting(properties: Record<string, string>) {
+    try {
+      const response = await this.client.crm.objects.basicApi.create('meetings', {
+        properties,
+      });
+      return response;
+    } catch (error) {
+      console.error('Error creating meeting:', error);
+      throw error;
+    }
+  }
+
+  // Associate a meeting with another object (companies, deals, contacts)
+  // v4 default association endpoint - no hardcoded typeId needed
+  async associateMeetingWith(toObjectType: string, meetingId: string, toObjectId: string) {
+    try {
+      console.log(`[HubSpot] Creating default association: meetings/${meetingId} → ${toObjectType}/${toObjectId}`);
+      await this.client.apiRequest({
+        method: 'PUT',
+        path: `/crm/v4/objects/meetings/${meetingId}/associations/default/${toObjectType}/${toObjectId}`,
+      });
+    } catch (error: any) {
+      console.error(`[HubSpot] Association failed: meetings/${meetingId} → ${toObjectType}/${toObjectId}`, {
+        status: error.statusCode || error.code,
+        message: error.body?.message || error.message,
+        details: JSON.stringify(error.body || {}).slice(0, 500),
+      });
+      throw error;
+    }
+  }
 }
 
 export const hubspotClient = new HubspotClient();

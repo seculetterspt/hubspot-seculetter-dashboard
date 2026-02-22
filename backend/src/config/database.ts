@@ -273,6 +273,45 @@ export async function initDatabase(): Promise<void> {
         UNIQUE(snapshot_date, pipeline_id, target_year)
       );
 
+      -- 미팅 기록 로컬 테이블 (음성 녹음 → HubSpot 저장 추적)
+      CREATE TABLE IF NOT EXISTS meeting_records (
+        id SERIAL PRIMARY KEY,
+        owner_id VARCHAR(50),
+        owner_name VARCHAR(255),
+        hubspot_meeting_id VARCHAR(50),
+        is_new_meeting BOOLEAN DEFAULT false,
+        summary TEXT,
+        structured_content JSONB,
+        associations JSONB DEFAULT '{}',
+        hubspot_status VARCHAR(20) DEFAULT 'saved',
+        hubspot_error TEXT,
+        association_errors JSONB DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Session table for express-session + connect-pg-simple
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        PRIMARY KEY ("sid")
+      );
+
+      -- Audit logs table for write operation tracking
+      CREATE TABLE IF NOT EXISTS "audit_logs" (
+        "id" SERIAL PRIMARY KEY,
+        "timestamp" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "user_email" VARCHAR(255) NOT NULL,
+        "action_type" VARCHAR(50) NOT NULL,
+        "target_id" VARCHAR(255),
+        "target_type" VARCHAR(50),
+        "status" VARCHAR(20) NOT NULL,
+        "error_message" TEXT,
+        "metadata" JSONB,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- 인덱스 생성
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_date ON deal_stage_changes(changed_at);
       CREATE INDEX IF NOT EXISTS idx_deal_stage_changes_deal ON deal_stage_changes(deal_id);
@@ -282,6 +321,22 @@ export async function initDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_activity_summaries_activity ON activity_summaries(activity_id);
       CREATE INDEX IF NOT EXISTS idx_weekly_pipeline_snapshot_date ON weekly_pipeline_snapshot(snapshot_date);
       CREATE INDEX IF NOT EXISTS idx_weekly_pipeline_snapshot_pipeline ON weekly_pipeline_snapshot(pipeline_id, target_year);
+      CREATE INDEX IF NOT EXISTS idx_meeting_records_created ON meeting_records(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_meeting_records_status ON meeting_records(hubspot_status);
+      CREATE INDEX IF NOT EXISTS IDX_session_expire ON "session" ("expire");
+      CREATE INDEX IF NOT EXISTS IDX_audit_logs_user_email ON "audit_logs" ("user_email");
+      CREATE INDEX IF NOT EXISTS IDX_audit_logs_timestamp ON "audit_logs" ("timestamp" DESC);
+      CREATE INDEX IF NOT EXISTS IDX_audit_logs_action_type ON "audit_logs" ("action_type");
+
+      -- OAuth state storage (for CSRF protection)
+      CREATE TABLE IF NOT EXISTS "oauth_state" (
+        "state" varchar NOT NULL UNIQUE PRIMARY KEY,
+        "return_url" varchar,
+        "created_at" timestamp DEFAULT CURRENT_TIMESTAMP,
+        "expires_at" timestamp NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS IDX_oauth_state_expires ON "oauth_state" ("expires_at");
     `);
     console.log('Database initialized successfully');
   } finally {

@@ -1,11 +1,11 @@
 services:
-  # Backend API
+  # Backend API + Frontend (single service)
   - type: web
     name: seculetter-hubspot-api
     runtime: node
     region: singapore
     plan: free
-    buildCommand: cd backend && npm install --include=dev && npm run build
+    buildCommand: cd backend && npm install --include=dev && npm run build && npm run build:frontend
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
@@ -19,28 +19,7 @@ services:
           name: seculetter-hubspot-db
           property: connectionString
       - key: FRONTEND_URL
-        value: https://seculetter-hubspot-dashboard.onrender.com
-    autoDeploy: true
-
-  # Frontend Dashboard
-  - type: web
-    name: seculetter-hubspot-dashboard
-    runtime: static
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: ./frontend/dist
-    routes:
-      - type: rewrite
-        source: /api/*
-        destination: https://seculetter-hubspot-api.onrender.com/api/*
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          type: web
-          name: seculetter-hubspot-api
-          property: host
+        value: https://seculetter-hubspot-api.onrender.com
     autoDeploy: true
 
 databases:

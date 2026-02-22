@@ -1,30 +1,80 @@
 import express from 'express';
-import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
-import { initDatabase } from './config/database.js';
+import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
+import { initDatabase, pool } from './config/database.js';
 import analyticsRouter from './routes/analytics.js';
 import snapshotRouter from './routes/snapshot.js';
+import meetingsRouter from './routes/meetings.js';
+import authRouter from './routes/auth.js';
+import { isAuthenticated, validateSession } from './middleware/auth.js';
 import { snapshotService } from './services/snapshot/SnapshotService.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://seculetter-hubspot-dashboard.onrender.com'
-  ],
-  credentials: true
-}));
-app.use(express.json());
+// Session store setup
+const PostgresqlStore = connectPgSimple(session);
+const sessionStore = new PostgresqlStore({
+  pool: pool,
+  tableName: 'session',
+});
 
-// Routes
-app.use('/api/analytics', analyticsRouter);
-app.use('/api/snapshot', snapshotRouter);
+// IMPORTANT: Register middleware and routes in correct order
+// 1. Body parsing (must come before routes)
+app.use(express.json({ limit: '25mb' }));
+
+// 2. Session middleware
+app.use(session({
+  store: sessionStore,
+  secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+}));
+
+// 3. Validate session
+app.use(validateSession);
+
+// 4. Auth routes (MUST come before static files to take precedence)
+app.use('/auth', authRouter);
+
+// 5. Protected API routes
+app.use('/api/analytics', isAuthenticated, analyticsRouter);
+app.use('/api/snapshot', isAuthenticated, snapshotRouter);
+app.use('/api/meetings', isAuthenticated, meetingsRouter);
+
+// 6. Static files (comes after auth routes)
+const publicPath = path.join(process.cwd(), 'public');
+app.use(express.static(publicPath, {
+  index: false  // Don't serve index.html automatically
+}));
+console.log('[Server] Serving static files from:', publicPath);
+
+// 7. Disable caching for HTML, JS, CSS files
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') || req.path.endsWith('.js') || req.path.endsWith('.css') || req.path === '/') {
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+  }
+  next();
+});
 
 // Health check
 app.get('/health', (req, res) => {
@@ -42,9 +92,27 @@ app.get('/api', (req, res) => {
       'GET /api/analytics/deal-summary',
       'POST /api/snapshot/create',
       'GET /api/snapshot/comparison',
-      'GET /api/snapshot/history'
+      'GET /api/snapshot/history',
+      'GET /api/meetings/owners',
+      'GET /api/meetings/scheduled',
+      'POST /api/meetings/transcribe',
+      'POST /api/meetings/structure',
+      'POST /api/meetings/recommend',
+      'POST /api/meetings/save',
+      'GET /api/meetings/records',
+      'DELETE /api/meetings/records/:id',
+      'GET /api/meetings/search'
     ]
   });
+});
+
+// SPA fallback: serve index.html for non-API/non-auth routes
+app.get('*', (req, res) => {
+  // Don't serve SPA for API, auth, or health check routes
+  if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path === '/health') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  res.sendFile(path.join(publicPath, 'index.html'));
 });
 
 // Initialize and start server

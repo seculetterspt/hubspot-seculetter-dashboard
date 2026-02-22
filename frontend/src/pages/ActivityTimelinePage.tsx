@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
-import { RefreshCw, Phone, FileText, Calendar, Mail, Sparkles, Building2, User, Briefcase, ExternalLink, MessageSquare } from 'lucide-react'
+import { RefreshCw, Phone, FileText, Calendar, Mail, Sparkles, Building2, User, Briefcase, ExternalLink, MessageSquare, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { api } from '../services/api'
 
 // HubSpot Portal ID
@@ -13,7 +14,6 @@ const getHubspotUrl = (type: 'company' | 'contact' | 'deal', id: string) => {
 // KST 기준 오늘 날짜 (YYYY-MM-DD)
 const getKSTToday = () => {
   const now = new Date()
-  // UTC + 9시간 = KST
   const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000))
   return kst.toISOString().split('T')[0]
 }
@@ -89,21 +89,21 @@ export default function ActivityTimelinePage() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const loadedDatesRef = useRef<Set<string>>(new Set())
+  const dateStripRef = useRef<HTMLDivElement>(null)
+  const desktopDateListRef = useRef<HTMLDivElement>(null)
 
-  // KST 기준 오늘 날짜와 날짜 범위 (매 렌더링마다 최신 값 사용)
   const today = getKSTToday()
   const dateRange = getKSTDateRange()
 
-  // 초기 로딩 (association 없이 빠르게)
+  // 초기 로딩
   const fetchData = async () => {
     setLoading(true)
     try {
       const url = `/analytics/activity-timeline?from=${dateRange.from}&to=${dateRange.to}`
       const res = await api.get(url)
       setData(res.data)
-
-      // 오늘 날짜 선택
       setSelectedDate(today)
     } catch (error) {
       console.error('Error:', error)
@@ -112,9 +112,8 @@ export default function ActivityTimelinePage() {
     }
   }
 
-  // 선택된 날짜의 상세 정보 로딩 (association + AI 요약)
+  // 선택된 날짜의 상세 정보 로딩
   const fetchDateDetails = async (dateStr: string) => {
-    // 이미 로딩한 날짜는 스킵
     if (loadedDatesRef.current.has(dateStr)) return
 
     setDetailLoading(true)
@@ -122,7 +121,6 @@ export default function ActivityTimelinePage() {
       const url = `/analytics/activity-timeline?from=${dateStr}&to=${dateStr}&includeAssociations=true&generateSummaries=true`
       const res = await api.get(url)
 
-      // 선택된 날짜의 데이터만 업데이트
       if (res.data.activitiesByDate[dateStr]) {
         setData(prev => prev ? {
           ...prev,
@@ -144,12 +142,40 @@ export default function ActivityTimelinePage() {
     fetchData()
   }, [])
 
-  // 날짜 선택 시 자동으로 상세 정보 로딩
   useEffect(() => {
     if (selectedDate && data) {
       fetchDateDetails(selectedDate)
     }
   }, [selectedDate, data])
+
+  // Auto-scroll date strip to today
+  useEffect(() => {
+    if (!loading) {
+      // Mobile date strip
+      if (dateStripRef.current) {
+        const todayEl = dateStripRef.current.querySelector('[data-today="true"]')
+        if (todayEl) {
+          todayEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+        }
+      }
+      // Desktop date list
+      if (desktopDateListRef.current) {
+        const todayEl = desktopDateListRef.current.querySelector('[data-today="true"]')
+        if (todayEl) {
+          todayEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }
+    }
+  }, [loading])
+
+  const toggleCard = (id: string) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -162,7 +188,6 @@ export default function ActivityTimelinePage() {
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp)
-    // KST 변환
     const kst = new Date(date.getTime() + (9 * 60 * 60 * 1000))
     const hours = String(kst.getUTCHours()).padStart(2, '0')
     const minutes = String(kst.getUTCMinutes()).padStart(2, '0')
@@ -203,12 +228,10 @@ export default function ActivityTimelinePage() {
     return dateStr > today
   }
 
-  // 범위 내 모든 날짜
   const allDates = generateAllDatesInRange(dateRange.from, dateRange.to)
-
   const selectedActivities = selectedDate && data?.activitiesByDate[selectedDate] || []
 
-  // 날짜 색상 결정
+  // Desktop date styles
   const getDateStyle = (dateStr: string, isSelected: boolean) => {
     const isToday = dateStr === today
     const isFuture = isDateInFuture(dateStr)
@@ -225,7 +248,6 @@ export default function ActivityTimelinePage() {
         ? 'bg-purple-50 border-purple-200 hover:bg-purple-100'
         : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
     }
-    // Past
     return hasActivity
       ? 'bg-gray-50 border-gray-200 hover:bg-gray-100'
       : 'bg-gray-50/50 border-gray-100 hover:bg-gray-100/50'
@@ -239,34 +261,285 @@ export default function ActivityTimelinePage() {
     )
   }
 
+  // Shared activity card renderer
+  const renderActivityCard = (activity: Activity, isMobile: boolean) => {
+    const companyName = activity.associations.companies[0]?.name
+    const contactName = activity.associations.contacts[0]?.name
+    const dealName = activity.associations.deals[0]?.name
+    const displayName = companyName || contactName || activity.title
+    const isExpanded = !isMobile || expandedCards.has(activity.id)
+
+    return (
+      <div
+        key={activity.id}
+        className={`rounded-xl border-2 ${getTypeBg(activity.type)} ${isMobile ? 'overflow-hidden' : 'p-4'}`}
+      >
+        {/* Card header - always visible */}
+        <button
+          onClick={() => isMobile && toggleCard(activity.id)}
+          className={`w-full text-left ${isMobile ? 'p-3.5' : 'cursor-default'}`}
+        >
+          <div className="flex items-start gap-3">
+            <div className="p-1.5 lg:p-2 bg-white rounded-lg shadow-sm flex-shrink-0">
+              {getTypeIcon(activity.type)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-gray-900 text-sm lg:text-base truncate">{displayName}</span>
+                <span className="text-xs lg:text-sm text-gray-500 flex-shrink-0">
+                  {getTypeLabel(activity.type)} {formatTimestamp(activity.timestamp)}
+                </span>
+              </div>
+
+              {/* AI Summary preview - always visible */}
+              {activity.aiSummary && (
+                <p className="text-xs lg:text-sm text-gray-600 mt-1 line-clamp-2">
+                  {activity.aiSummary}
+                </p>
+              )}
+            </div>
+
+            {/* Mobile expand/collapse indicator */}
+            {isMobile && (
+              <div className="flex-shrink-0 pt-0.5">
+                {isExpanded
+                  ? <ChevronUp size={18} className="text-gray-400" />
+                  : <ChevronDown size={18} className="text-gray-400" />
+                }
+              </div>
+            )}
+          </div>
+        </button>
+
+        {/* Expanded content */}
+        {isExpanded && (
+          <div className={`${isMobile ? 'px-3.5 pb-3.5' : 'mt-3'} space-y-3`}>
+            {/* Association links */}
+            {(activity.associations.companies[0] || activity.associations.contacts[0] || activity.associations.deals[0]) && (
+              <div className="flex items-center gap-3 lg:gap-4 text-sm text-gray-600 flex-wrap">
+                {activity.associations.companies[0] && (
+                  <a
+                    href={getHubspotUrl('company', activity.associations.companies[0].id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 active:text-blue-600 transition-colors"
+                  >
+                    <Building2 size={14} className="text-blue-500" />
+                    <span className="truncate max-w-[120px] lg:max-w-none">{companyName}</span>
+                    <ExternalLink size={12} className="text-gray-400 flex-shrink-0" />
+                  </a>
+                )}
+                {activity.associations.contacts[0] && (
+                  <a
+                    href={getHubspotUrl('contact', activity.associations.contacts[0].id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 active:text-green-600 transition-colors"
+                  >
+                    <User size={14} className="text-green-500" />
+                    <span className="truncate max-w-[120px] lg:max-w-none">{contactName}</span>
+                    <ExternalLink size={12} className="text-gray-400 flex-shrink-0" />
+                  </a>
+                )}
+                {activity.associations.deals[0] && (
+                  <a
+                    href={getHubspotUrl('deal', activity.associations.deals[0].id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 active:text-purple-600 transition-colors"
+                  >
+                    <Briefcase size={14} className="text-purple-500" />
+                    <span className="truncate max-w-[120px] lg:max-w-none">{dealName}</span>
+                    <ExternalLink size={12} className="text-gray-400 flex-shrink-0" />
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Body content */}
+            {activity.body && (
+              <div className="bg-white/50 rounded-lg p-3 text-sm text-gray-700">
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: activity.body.substring(0, 500) + (activity.body.length > 500 ? '...' : '')
+                  }}
+                  className="prose prose-sm max-w-none"
+                />
+              </div>
+            )}
+
+            {/* Comments */}
+            {activity.comments && activity.comments.length > 0 && (
+              <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                <div className="flex items-center gap-1 text-xs text-amber-700 mb-2">
+                  <MessageSquare size={12} />
+                  <span className="font-medium">댓글 ({activity.comments.length})</span>
+                </div>
+                <div className="space-y-2">
+                  {activity.comments.map((comment, idx) => (
+                    <div key={comment.id || idx} className="text-sm text-gray-700 pl-3 border-l-2 border-amber-300">
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: comment.body.substring(0, 300) + (comment.body.length > 300 ? '...' : '')
+                        }}
+                        className="prose prose-sm max-w-none"
+                      />
+                      <span className="text-xs text-gray-400 mt-1 block">
+                        {formatTimestamp(comment.timestamp)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AI Insight - full version */}
+            {activity.aiSummary && (
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-3 lg:p-4 border border-purple-200">
+                <div className="flex items-center gap-1 text-xs text-purple-600 mb-2">
+                  <Sparkles size={12} />
+                  <span className="font-medium">AI 인사이트</span>
+                </div>
+                <p className="text-sm text-gray-800 leading-relaxed">{activity.aiSummary}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 lg:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">활동 타임라인</h1>
-          <p className="text-gray-500 mt-1">
-            {dateRange.from} ~ {dateRange.to} | 총 {data?.totalCount || 0}건의 활동
+          <h1 className="text-lg lg:text-2xl font-bold text-gray-900">활동 타임라인</h1>
+          <p className="text-xs lg:text-sm text-gray-500 mt-0.5 lg:mt-1">
+            <span className="hidden lg:inline">{dateRange.from} ~ {dateRange.to} | </span>
+            총 {data?.totalCount || 0}건의 활동
           </p>
         </div>
-        <button
-          onClick={() => {
-            loadedDatesRef.current.clear()
-            fetchData()
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-        >
-          <RefreshCw size={18} />
-          새로고침
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/meeting/records"
+            className="flex items-center gap-1.5 px-3 py-2 lg:px-4 lg:py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 active:bg-gray-100 text-sm"
+          >
+            <ClipboardList size={16} />
+            <span className="hidden sm:inline">기록 관리</span>
+          </Link>
+          <button
+            onClick={() => {
+              loadedDatesRef.current.clear()
+              fetchData()
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 lg:px-4 lg:py-2 bg-primary-600 text-white rounded-lg active:bg-primary-700 hover:bg-primary-700 text-sm"
+          >
+            <RefreshCw size={16} />
+            <span className="hidden sm:inline">새로고침</span>
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* ===== MOBILE: Horizontal Date Strip + Activity List ===== */}
+      <div className="lg:hidden">
+        {/* Horizontal scrollable date strip */}
+        <div
+          ref={dateStripRef}
+          className="flex gap-1.5 overflow-x-auto pb-3 -mx-4 px-4 scrollbar-hide"
+        >
+          {allDates.map(dateStr => {
+            const { day, dayName } = formatDate(dateStr)
+            const count = data?.activitiesByDate[dateStr]?.length || 0
+            const isSelected = selectedDate === dateStr
+            const isToday = dateStr === today
+            const isFuture = isDateInFuture(dateStr)
+            const isWeekend = dayName === '토' || dayName === '일'
+
+            return (
+              <button
+                key={dateStr}
+                data-today={isToday ? 'true' : undefined}
+                onClick={() => setSelectedDate(dateStr)}
+                className={`flex-shrink-0 flex flex-col items-center min-w-[48px] py-2 px-1 rounded-xl border-2 transition-all ${
+                  isSelected
+                    ? 'border-primary-500 bg-primary-50'
+                    : isToday
+                      ? 'border-blue-400 bg-blue-50'
+                      : isFuture && count > 0
+                        ? 'border-purple-200 bg-purple-50/50'
+                        : 'border-transparent bg-white'
+                }`}
+              >
+                <span className={`text-[10px] font-medium ${
+                  isSelected ? 'text-primary-600'
+                    : isToday ? 'text-blue-600'
+                    : isWeekend ? 'text-red-400'
+                    : 'text-gray-400'
+                }`}>
+                  {dayName}
+                </span>
+                <span className={`text-lg font-bold leading-tight ${
+                  isSelected ? 'text-primary-700'
+                    : isToday ? 'text-blue-700'
+                    : count > 0 ? 'text-gray-900'
+                    : 'text-gray-300'
+                }`}>
+                  {day}
+                </span>
+                {count > 0 ? (
+                  <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
+                    isSelected ? 'bg-primary-500'
+                      : isToday ? 'bg-blue-500'
+                      : isFuture ? 'bg-purple-400'
+                      : 'bg-gray-400'
+                  }`} />
+                ) : (
+                  <div className="w-1.5 h-1.5 mt-0.5" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Selected date header */}
+        {selectedDate && (
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-gray-900">
+              {formatDate(selectedDate).full}
+            </h2>
+            <div className="flex items-center gap-2">
+              {detailLoading && (
+                <div className="flex items-center gap-1.5 text-purple-600">
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-purple-600"></div>
+                  <span className="text-xs">AI 분석 중...</span>
+                </div>
+              )}
+              <span className="text-xs text-gray-500">{selectedActivities.length}건</span>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile activity cards - collapsible */}
+        <div className="space-y-2.5">
+          {selectedActivities.map(activity => renderActivityCard(activity, true))}
+
+          {selectedDate && selectedActivities.length === 0 && (
+            <div className="text-center text-gray-400 py-12">
+              <Calendar size={36} className="mx-auto mb-3 opacity-50" />
+              <p className="text-sm">이 날짜에 기록된 활동이 없습니다</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ===== DESKTOP: Original 2-column grid layout ===== */}
+      <div className="hidden lg:grid lg:grid-cols-4 gap-6">
         {/* 날짜 목록 (좌측) */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h2 className="font-semibold text-gray-900 mb-4">날짜별 활동</h2>
-            <div className="space-y-1 max-h-[600px] overflow-y-auto">
+            <div ref={desktopDateListRef} className="space-y-1 max-h-[600px] overflow-y-auto">
               {allDates.map(dateStr => {
                 const { month, day, dayName } = formatDate(dateStr)
                 const count = data?.activitiesByDate[dateStr]?.length || 0
@@ -277,6 +550,7 @@ export default function ActivityTimelinePage() {
                 return (
                   <button
                     key={dateStr}
+                    data-today={isToday ? 'true' : undefined}
                     onClick={() => setSelectedDate(dateStr)}
                     className={`w-full text-left p-2.5 rounded-lg border transition-all ${getDateStyle(dateStr, isSelected)}`}
                   >
@@ -343,125 +617,7 @@ export default function ActivityTimelinePage() {
                 </div>
 
                 <div className="space-y-4">
-                  {selectedActivities.map(activity => {
-                    const companyName = activity.associations.companies[0]?.name
-                    const contactName = activity.associations.contacts[0]?.name
-                    const dealName = activity.associations.deals[0]?.name
-
-                    // 표시 이름: 회사명 우선, 없으면 담당자명, 없으면 기존 제목
-                    const displayName = companyName || contactName || activity.title
-
-                    return (
-                      <div
-                        key={activity.id}
-                        className={`p-4 rounded-xl border-2 ${getTypeBg(activity.type)}`}
-                      >
-                        {/* 헤더: 회사명/담당자명 (활동유형: 날짜) */}
-                        <div className="flex items-start gap-3 mb-3">
-                          <div className="p-2 bg-white rounded-lg shadow-sm">
-                            {getTypeIcon(activity.type)}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-gray-900">{displayName}</span>
-                              <span className="text-gray-500">
-                                ({getTypeLabel(activity.type)}: {activity.date})
-                              </span>
-                            </div>
-
-                            {/* 연결 정보 - 회사/담당자/거래 (HubSpot 링크 포함) */}
-                            <div className="flex items-center gap-4 mt-1 text-sm text-gray-600 flex-wrap">
-                              {activity.associations.companies[0] && (
-                                <a
-                                  href={getHubspotUrl('company', activity.associations.companies[0].id)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 hover:text-blue-600 transition-colors"
-                                >
-                                  <Building2 size={14} className="text-blue-500" />
-                                  {companyName}
-                                  <ExternalLink size={12} className="text-gray-400" />
-                                </a>
-                              )}
-                              {activity.associations.contacts[0] && (
-                                <a
-                                  href={getHubspotUrl('contact', activity.associations.contacts[0].id)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 hover:text-green-600 transition-colors"
-                                >
-                                  <User size={14} className="text-green-500" />
-                                  {contactName}
-                                  <ExternalLink size={12} className="text-gray-400" />
-                                </a>
-                              )}
-                              {activity.associations.deals[0] && (
-                                <a
-                                  href={getHubspotUrl('deal', activity.associations.deals[0].id)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 hover:text-purple-600 transition-colors"
-                                >
-                                  <Briefcase size={14} className="text-purple-500" />
-                                  {dealName}
-                                  <ExternalLink size={12} className="text-gray-400" />
-                                </a>
-                              )}
-                              <span className="text-gray-400">{formatTimestamp(activity.timestamp)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 내용 표시 */}
-                        {activity.body && (
-                          <div className="bg-white/50 rounded-lg p-3 text-sm text-gray-700 mb-3">
-                            <div
-                              dangerouslySetInnerHTML={{
-                                __html: activity.body.substring(0, 500) + (activity.body.length > 500 ? '...' : '')
-                              }}
-                              className="prose prose-sm max-w-none"
-                            />
-                          </div>
-                        )}
-
-                        {/* 댓글/노트 표시 */}
-                        {activity.comments && activity.comments.length > 0 && (
-                          <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 mb-3">
-                            <div className="flex items-center gap-1 text-xs text-amber-700 mb-2">
-                              <MessageSquare size={12} />
-                              <span className="font-medium">댓글 ({activity.comments.length})</span>
-                            </div>
-                            <div className="space-y-2">
-                              {activity.comments.map((comment, idx) => (
-                                <div key={comment.id || idx} className="text-sm text-gray-700 pl-3 border-l-2 border-amber-300">
-                                  <div
-                                    dangerouslySetInnerHTML={{
-                                      __html: comment.body.substring(0, 300) + (comment.body.length > 300 ? '...' : '')
-                                    }}
-                                    className="prose prose-sm max-w-none"
-                                  />
-                                  <span className="text-xs text-gray-400 mt-1 block">
-                                    {formatTimestamp(comment.timestamp)}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* AI 인사이트 */}
-                        {activity.aiSummary && (
-                          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
-                            <div className="flex items-center gap-1 text-xs text-purple-600 mb-2">
-                              <Sparkles size={12} />
-                              <span className="font-medium">AI 인사이트</span>
-                            </div>
-                            <p className="text-gray-800 leading-relaxed">{activity.aiSummary}</p>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                  {selectedActivities.map(activity => renderActivityCard(activity, false))}
 
                   {selectedActivities.length === 0 && (
                     <p className="text-center text-gray-500 py-12">
