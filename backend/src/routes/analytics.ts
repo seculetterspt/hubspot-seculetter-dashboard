@@ -367,24 +367,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           associations: emptyAssociations,
           comments: []
         });
-
-        for (const call of filteredCalls) {
-          const timestamp = call.properties.hs_timestamp || '';
-          const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-
-          activities.push({
-            id: call.id,
-            type: 'call',
-            title: call.properties.hs_call_title || '(제목 없음)',
-            body: call.properties.hs_call_body || '',
-            timestamp,
-            date,
-            associations: emptyAssociations,
-            comments: []
-          });
-        }
-        callsAfter = callsRes.paging?.next?.after;
-      } while (callsAfter);
+      }
     } catch (error) {
       console.error('Error fetching calls for timeline:', error);
       // fallback: 기존 getPage 방식
@@ -430,24 +413,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           associations: emptyAssociations,
           comments: []
         });
-
-        for (const note of filteredNotes) {
-          const timestamp = note.properties.hs_timestamp || '';
-          const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-
-          activities.push({
-            id: note.id,
-            type: 'note',
-            title: '메모',
-            body: note.properties.hs_note_body || '',
-            timestamp,
-            date,
-            associations: emptyAssociations,
-            comments: []
-          });
-        }
-        notesAfter = notesRes.paging?.next?.after;
-      } while (notesAfter);
+      }
     } catch (error) {
       console.error('Error fetching notes for timeline:', error);
       // fallback: 기존 getPage 방식
@@ -500,31 +466,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           associations: emptyAssociations,
           comments: []
         });
-
-        for (const meeting of filteredMeetings) {
-          const timestamp = meeting.properties.hs_meeting_start_time || '';
-          const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-
-          // 미팅 본문과 내부 노트를 합침
-          const meetingBody = meeting.properties.hs_meeting_body || '';
-          const internalNotes = meeting.properties.hs_internal_meeting_notes || '';
-          const combinedBody = internalNotes
-            ? `${meetingBody}\n\n[내부 노트]\n${internalNotes}`
-            : meetingBody;
-
-          activities.push({
-            id: meeting.id,
-            type: 'meeting',
-            title: meeting.properties.hs_meeting_title || '(제목 없음)',
-            body: combinedBody || '',
-            timestamp,
-            date,
-            associations: emptyAssociations,
-            comments: []
-          });
-        }
-        meetingsAfter = meetingsRes.paging?.next?.after;
-      } while (meetingsAfter);
+      }
     } catch (error) {
       console.error('Error fetching meetings for timeline:', error);
       // fallback: 기존 getPage 방식
