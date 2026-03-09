@@ -122,8 +122,13 @@ class SnapshotService {
       );
 
       // 파이프라인 합계 계산
+      // 단, "성사되지 않은", "lost", "closed lost" 등은 제외
       const isClosedWonStage = (stageLabel: string): boolean => {
         const label = stageLabel.toLowerCase();
+        // 성사되지 않은 거래(Lost deals)는 제외
+        if (label.includes('성사되지 않은') || label.includes('lost') || label.includes('closed lost')) {
+          return false;
+        }
         return label.includes('완료') || label.includes('성사') || label.includes('won') || label.includes('closed');
       };
 
@@ -292,15 +297,24 @@ class SnapshotService {
     };
 
     // 이전 주 스냅샷 가져오기 (스냅샷 2개 이상이면 두 번째로 최신 것 사용)
-    const previousResult = await this.getPreviousWeekSnapshot(pipelineId, targetYear);
+    let previousResult = await this.getPreviousWeekSnapshot(pipelineId, targetYear);
 
+    // 스냅샷이 없으면 현재 데이터로 스냅샷 생성 후 반환 (첫 방문 시)
     if (!previousResult) {
-      return {
-        current,
-        previous: null,
-        previousSnapshotDate: null,
-        changes: null
-      };
+      console.log(`[Snapshot] No snapshot found for pipeline ${pipelineId}, creating initial snapshot...`);
+      await this.saveSnapshotForPipeline(pipelineId, targetYear);
+
+      // 방금 생성한 스냅샷 조회
+      previousResult = await this.getLatestSnapshot(pipelineId, targetYear);
+
+      if (!previousResult) {
+        return {
+          current,
+          previous: null,
+          previousSnapshotDate: null,
+          changes: null
+        };
+      }
     }
 
     const previous = previousResult.data;
@@ -316,6 +330,75 @@ class SnapshotService {
         closedWonAmount: current.closedWonAmount - previous.closedWonAmount,
         totalCount: current.totalCount - previous.totalCount
       }
+    };
+  }
+
+  // 특정 파이프라인만 스냅샷 저장
+  async saveSnapshotForPipeline(pipelineId: string, targetYear: number): Promise<void> {
+    const date = new Date();
+    const dateStr = date.toISOString().split('T')[0];
+
+    console.log(`[Snapshot] Saving snapshot for pipeline ${pipelineId} (${targetYear}) on ${dateStr}...`);
+
+    const pipelineData = await this.getCurrentPipelineData(pipelineId, targetYear);
+
+    for (const pipeline of pipelineData) {
+      await pool.query(
+        `INSERT INTO weekly_pipeline_snapshot
+         (snapshot_date, pipeline_id, pipeline_label, target_year, total_amount, weighted_amount, open_amount, closed_won_amount, total_count, by_stage)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (snapshot_date, pipeline_id, target_year)
+         DO UPDATE SET
+           pipeline_label = EXCLUDED.pipeline_label,
+           total_amount = EXCLUDED.total_amount,
+           weighted_amount = EXCLUDED.weighted_amount,
+           open_amount = EXCLUDED.open_amount,
+           closed_won_amount = EXCLUDED.closed_won_amount,
+           total_count = EXCLUDED.total_count,
+           by_stage = EXCLUDED.by_stage`,
+        [
+          dateStr,
+          pipeline.pipelineId,
+          pipeline.pipelineLabel,
+          targetYear,
+          pipeline.totals.totalAmount,
+          pipeline.totals.weightedAmount,
+          pipeline.totals.openAmount,
+          pipeline.totals.closedWonAmount,
+          pipeline.totals.totalCount,
+          JSON.stringify(pipeline.stages)
+        ]
+      );
+
+      console.log(`[Snapshot] Saved: ${pipeline.pipelineLabel} (${targetYear})`);
+    }
+  }
+
+  // 가장 최근 스냅샷 조회
+  async getLatestSnapshot(pipelineId: string, targetYear: number): Promise<{ data: PipelineTotals; snapshotDate: string } | null> {
+    const result = await pool.query(
+      `SELECT snapshot_date, total_amount, weighted_amount, open_amount, closed_won_amount, total_count
+       FROM weekly_pipeline_snapshot
+       WHERE pipeline_id = $1 AND target_year = $2
+       ORDER BY snapshot_date DESC
+       LIMIT 1`,
+      [pipelineId, targetYear]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    return {
+      data: {
+        totalAmount: parseFloat(row.total_amount) || 0,
+        weightedAmount: parseFloat(row.weighted_amount) || 0,
+        openAmount: parseFloat(row.open_amount) || 0,
+        closedWonAmount: parseFloat(row.closed_won_amount) || 0,
+        totalCount: parseInt(row.total_count) || 0
+      },
+      snapshotDate: row.snapshot_date.toISOString().split('T')[0]
     };
   }
 

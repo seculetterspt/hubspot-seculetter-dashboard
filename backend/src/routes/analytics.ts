@@ -195,9 +195,14 @@ router.get('/deal-summary', async (req: Request, res: Response) => {
       });
 
       // 파이프라인 합계 계산
-      // "거래 완료", "성사", "won" 등의 라벨을 가진 스테이지를 성사된 거래로 인식
+      // "거래 완료", "성사된 거래", "won" 등의 라벨을 가진 스테이지를 성사된 거래로 인식
+      // 단, "성사되지 않은", "lost", "closed lost" 등은 제외
       const isClosedWonStage = (stageLabel: string): boolean => {
         const label = stageLabel.toLowerCase();
+        // 성사되지 않은 거래(Lost deals)는 제외
+        if (label.includes('성사되지 않은') || label.includes('lost') || label.includes('closed lost')) {
+          return false;
+        }
         return label.includes('완료') || label.includes('성사') || label.includes('won') || label.includes('closed');
       };
 
