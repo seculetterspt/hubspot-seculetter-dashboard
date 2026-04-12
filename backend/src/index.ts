@@ -9,6 +9,7 @@ import { initDatabase, pool } from './config/database.js';
 import analyticsRouter from './routes/analytics.js';
 import snapshotRouter from './routes/snapshot.js';
 import meetingsRouter from './routes/meetings.js';
+import weeklyMeetingsRouter from './routes/weekly-meetings.js';
 import authRouter from './routes/auth.js';
 import { isAuthenticated, validateSession } from './middleware/auth.js';
 import { snapshotService } from './services/snapshot/SnapshotService.js';
@@ -56,6 +57,7 @@ app.use('/auth', authRouter);
 app.use('/api/analytics', isAuthenticated, analyticsRouter);
 app.use('/api/snapshot', isAuthenticated, snapshotRouter);
 app.use('/api/meetings', isAuthenticated, meetingsRouter);
+app.use('/api/weekly-meetings', isAuthenticated, weeklyMeetingsRouter);
 
 // 6. Static files (comes after auth routes)
 const publicPath = path.join(process.cwd(), 'public');
@@ -101,7 +103,13 @@ app.get('/api', (req, res) => {
       'POST /api/meetings/save',
       'GET /api/meetings/records',
       'DELETE /api/meetings/records/:id',
-      'GET /api/meetings/search'
+      'GET /api/meetings/search',
+      'GET /api/weekly-meetings',
+      'GET /api/weekly-meetings/:date',
+      'POST /api/weekly-meetings',
+      'POST /api/weekly-meetings/parse',
+      'DELETE /api/weekly-meetings/:id',
+      'GET /api/weekly-meetings/search/deals'
     ]
   });
 });

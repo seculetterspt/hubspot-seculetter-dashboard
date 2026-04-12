@@ -337,6 +337,20 @@ export async function initDatabase(): Promise<void> {
       );
 
       CREATE INDEX IF NOT EXISTS IDX_oauth_state_expires ON "oauth_state" ("expires_at");
+
+      -- 주간회의 기록 테이블
+      CREATE TABLE IF NOT EXISTS "weekly_meetings" (
+        "id" SERIAL PRIMARY KEY,
+        "meeting_date" DATE NOT NULL,
+        "created_by" VARCHAR(255),
+        "raw_content" TEXT NOT NULL,
+        "parsed_items" JSONB DEFAULT '[]',
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS IDX_weekly_meetings_date ON "weekly_meetings" ("meeting_date" DESC);
+      CREATE INDEX IF NOT EXISTS IDX_weekly_meetings_created_by ON "weekly_meetings" ("created_by");
     `);
     console.log('Database initialized successfully');
   } finally {
