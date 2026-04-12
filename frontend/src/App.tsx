@@ -6,6 +6,7 @@ import ActivityTimelinePage from './pages/ActivityTimelinePage'
 import DealSummaryPage from './pages/DealSummaryPage'
 import MeetingLogPage from './pages/MeetingLogPage'
 import MeetingRecordsPage from './pages/MeetingRecordsPage'
+import WeeklyMeetingPage from './pages/WeeklyMeetingPage'
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
                 <Route path="/meeting/new" element={<MeetingLogPage />} />
                 <Route path="/meeting/records" element={<MeetingRecordsPage />} />
                 <Route path="/deals" element={<DealSummaryPage />} />
+                <Route path="/weekly" element={<WeeklyMeetingPage />} />
               </Routes>
             </Layout>
           </ProtectedRoute>

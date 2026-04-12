@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Calendar, Briefcase, PenSquare, LogOut, User } from 'lucide-react'
+import { Calendar, Briefcase, PenSquare, LogOut, User, Users } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 interface LayoutProps {
@@ -23,7 +23,8 @@ export default function Layout({ children }: LayoutProps) {
   const navItems = [
     { path: '/', label: '타임라인', mobileLabel: '타임라인', icon: Calendar },
     { path: '/meeting/new', label: '미팅 기록', mobileLabel: '기록', icon: PenSquare, isAction: true },
-    { path: '/deals', label: '딜 요약', mobileLabel: '딜 요약', icon: Briefcase },
+    { path: '/deals', label: '딜 요약', mobileLabel: '딜', icon: Briefcase },
+    { path: '/weekly', label: '주간회의', mobileLabel: '주간', icon: Users },
   ]
 
   return (
