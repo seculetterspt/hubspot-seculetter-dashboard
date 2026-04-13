@@ -13,6 +13,14 @@ const openai = new OpenAI({
 interface WeeklyMeetingItem {
   companyName: string;
   content: string;
+  // 구조화된 상세 정보
+  actionType?: string;       // 액션 유형 (미팅, POC, 시연, 계약, 제안서, 영업활동 등)
+  actionStatus?: string;     // 상태 (진행중, 예정, 완료, 대기)
+  scheduledDate?: string;    // 예정 일정 (차주 월요일, 4월 중 등)
+  partner?: string;          // 파트너사 정보
+  keyPoints?: string[];      // 핵심 포인트 목록
+  nextSteps?: string;        // 다음 단계
+  priority?: 'high' | 'medium' | 'low';  // 우선순위
   matchedDeals: Array<{
     id: string;
     name: string;
@@ -80,9 +88,8 @@ router.post('/parse', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Content too short' });
     }
 
-    // Step 1: LLM으로 회의 내용 파싱 (회사명 + 내용 추출)
-    const parsePrompt = `다음 주간회의 내용을 분석하여 회사별로 구분하세요.
-각 항목에서 회사명과 해당 내용을 추출하세요.
+    // Step 1: LLM으로 회의 내용 파싱 (구조화된 정보 추출)
+    const parsePrompt = `다음 주간회의 내용을 분석하여 회사별로 구분하고 상세 정보를 추출하세요.
 
 입력:
 ${content}
@@ -91,16 +98,58 @@ JSON 형식으로 응답:
 {
   "items": [
     {
-      "companyName": "회사명 (정확히)",
-      "content": "해당 회사 관련 내용 전체 (여러 줄이면 합쳐서)"
+      "companyName": "회사명 (고객사명, 정확히)",
+      "content": "해당 회사 관련 내용 전체",
+      "actionType": "액션 유형",
+      "actionStatus": "상태",
+      "scheduledDate": "예정 일정",
+      "partner": "파트너사",
+      "keyPoints": ["핵심 포인트 1", "핵심 포인트 2"],
+      "nextSteps": "다음 단계",
+      "priority": "우선순위"
     }
   ]
 }
 
-규칙:
-- 회사명은 정확히 추출 (한국투자증권, 법무부, 비엔씨, 푸본현대생명, 한국소비자원 등)
-- 내용은 해당 회사에 대한 모든 정보를 포함
-- 파트너사 정보(에스이정보, 오렌지아이티, 티앤디소프트 등)도 내용에 포함`;
+필드별 규칙:
+
+1. companyName: 고객사명 정확히 추출 (한국투자증권, 법무부, 비엔씨, 푸본현대생명 등)
+
+2. content: 해당 회사에 대한 모든 정보를 자연스럽게 정리
+
+3. actionType: 아래 중 가장 적합한 것 선택
+   - "POC" (개념 검증, POC 진행)
+   - "미팅" (고객 미팅, 회의)
+   - "시연" (제품 시연, 데모)
+   - "제안" (제안서 작성, 제출)
+   - "계약" (계약 협의, 체결)
+   - "기술지원" (기술 검토, 연동, 테스트)
+   - "파트너십" (파트너 등록, 협력)
+   - "유지보수" (노후화 교체, 유지보수)
+   - "영업활동" (일반적인 영업 활동)
+
+4. actionStatus: 아래 중 가장 적합한 것 선택
+   - "예정" (앞으로 할 일)
+   - "진행중" (현재 진행 중)
+   - "완료" (이미 완료됨)
+   - "대기" (고객 응답 대기 등)
+
+5. scheduledDate: 일정 정보 추출 (예: "차주 월요일", "4월 중", "이번 주" 등)
+   - 언급된 일정이 없으면 null
+
+6. partner: 언급된 파트너사명 (에스이정보, 오렌지아이티, 티앤디소프트 등)
+   - 파트너사가 없으면 null
+
+7. keyPoints: 핵심 활동/내용을 간결한 문장으로 나열 (최대 3개)
+   - 예: ["POC 시나리오 자료 전달", "고객사 미팅 진행 예정"]
+
+8. nextSteps: 다음 단계나 필요한 조치
+   - 예: "고객사 피드백 대기", "제안서 작성 필요"
+
+9. priority: 긴급도/중요도 판단
+   - "high": 이번 주 내 액션 필요, 계약 임박, POC 진행 중
+   - "medium": 차주 예정, 일반적인 영업 활동
+   - "low": 장기 건, 초기 접촉 단계`;
 
     const parseResponse = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -191,6 +240,13 @@ JSON 형식으로 응답:
       items.push({
         companyName,
         content: item.content || '',
+        actionType: item.actionType || undefined,
+        actionStatus: item.actionStatus || undefined,
+        scheduledDate: item.scheduledDate || undefined,
+        partner: item.partner || undefined,
+        keyPoints: item.keyPoints || undefined,
+        nextSteps: item.nextSteps || undefined,
+        priority: item.priority || undefined,
         matchedDeals,
       });
     }
