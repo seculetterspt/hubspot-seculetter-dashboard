@@ -135,7 +135,7 @@ JSON 형식으로 응답:
               matchedDeals.push({
                 id: deal.id,
                 name: dealDetail.properties.dealname || deal.name,
-                stage: dealDetail.properties.dealstage,
+                stage: dealDetail.properties.dealstage ?? undefined,
                 amount: dealDetail.properties.amount ? parseFloat(dealDetail.properties.amount) : undefined,
               });
             } catch (e) {
@@ -171,7 +171,7 @@ JSON 형식으로 응답:
                     matchedDeals.push({
                       id: assoc.toObjectId,
                       name: dealDetail.properties.dealname || '(거래명 없음)',
-                      stage: dealDetail.properties.dealstage,
+                      stage: dealDetail.properties.dealstage ?? undefined,
                       amount: dealDetail.properties.amount ? parseFloat(dealDetail.properties.amount) : undefined,
                     });
                   }
