@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Calendar, Plus, Save, Loader2, Trash2, Link, ExternalLink, ChevronDown, ChevronUp, RefreshCw, Search } from 'lucide-react'
+import { Calendar, Plus, Save, Loader2, Trash2, Link, ExternalLink, ChevronDown, ChevronUp, RefreshCw, Search, Target, Clock, Users, CheckCircle2, AlertCircle, ArrowRight, Briefcase } from 'lucide-react'
 import { api } from '../services/api'
 
 interface MatchedDeal {
@@ -12,6 +12,13 @@ interface MatchedDeal {
 interface ParsedItem {
   companyName: string
   content: string
+  actionType?: string       // POC, 미팅, 시연, 제안, 계약, 기술지원, 파트너십, 유지보수, 영업활동
+  actionStatus?: string     // 예정, 진행중, 완료, 대기
+  scheduledDate?: string    // 예정 일정
+  partner?: string          // 파트너사
+  keyPoints?: string[]      // 핵심 포인트 목록
+  nextSteps?: string        // 다음 단계
+  priority?: 'high' | 'medium' | 'low'
   matchedDeals: MatchedDeal[]
 }
 
@@ -372,13 +379,92 @@ export default function WeeklyMeetingPage() {
                     {/* 확장 내용 */}
                     {expandedItems.has(index) && (
                       <div className="px-4 py-3 space-y-4">
-                        {/* 내용 */}
+                        {/* 상단 태그/배지 영역 */}
+                        <div className="flex flex-wrap gap-2">
+                          {/* 액션 유형 */}
+                          {item.actionType && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                              <Target size={12} />
+                              {item.actionType}
+                            </span>
+                          )}
+                          {/* 상태 */}
+                          {item.actionStatus && (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${
+                              item.actionStatus === '완료' ? 'bg-green-100 text-green-700' :
+                              item.actionStatus === '진행중' ? 'bg-yellow-100 text-yellow-700' :
+                              item.actionStatus === '예정' ? 'bg-purple-100 text-purple-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {item.actionStatus === '완료' ? <CheckCircle2 size={12} /> :
+                               item.actionStatus === '진행중' ? <Loader2 size={12} /> :
+                               item.actionStatus === '예정' ? <Clock size={12} /> :
+                               <AlertCircle size={12} />}
+                              {item.actionStatus}
+                            </span>
+                          )}
+                          {/* 우선순위 */}
+                          {item.priority && (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${
+                              item.priority === 'high' ? 'bg-red-100 text-red-700' :
+                              item.priority === 'medium' ? 'bg-orange-100 text-orange-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {item.priority === 'high' ? '높음' : item.priority === 'medium' ? '보통' : '낮음'}
+                            </span>
+                          )}
+                          {/* 예정 일정 */}
+                          {item.scheduledDate && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded-full">
+                              <Calendar size={12} />
+                              {item.scheduledDate}
+                            </span>
+                          )}
+                          {/* 파트너사 */}
+                          {item.partner && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-100 text-teal-700 text-xs font-medium rounded-full">
+                              <Users size={12} />
+                              {item.partner}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* 핵심 포인트 */}
+                        {item.keyPoints && item.keyPoints.length > 0 && (
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <h4 className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                              <Briefcase size={12} />
+                              핵심 활동
+                            </h4>
+                            <ul className="space-y-1.5">
+                              {item.keyPoints.map((point, i) => (
+                                <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                                  <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
+                                  {point}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* 내용 (원본) */}
                         <div>
-                          <h4 className="text-xs font-medium text-gray-500 mb-1">내용</h4>
+                          <h4 className="text-xs font-medium text-gray-500 mb-1">상세 내용</h4>
                           <p className="text-sm text-gray-700 whitespace-pre-wrap">
                             {item.content}
                           </p>
                         </div>
+
+                        {/* 다음 단계 */}
+                        {item.nextSteps && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <h4 className="text-xs font-medium text-amber-700 mb-1 flex items-center gap-1">
+                              <ArrowRight size={12} />
+                              다음 단계
+                            </h4>
+                            <p className="text-sm text-amber-800">{item.nextSteps}</p>
+                          </div>
+                        )}
 
                         {/* 연결된 딜 */}
                         <div>
