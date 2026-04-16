@@ -65,6 +65,7 @@ interface Activity {
   body: string
   timestamp: string
   date: string
+  ownerName?: string
   associations: {
     companies: Association[]
     contacts: Association[]
@@ -289,6 +290,12 @@ export default function ActivityTimelinePage() {
                 <span className="text-xs lg:text-sm text-gray-500 flex-shrink-0">
                   {getTypeLabel(activity.type)} {formatTimestamp(activity.timestamp)}
                 </span>
+                {activity.ownerName && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-xs flex-shrink-0">
+                    <User size={10} />
+                    {activity.ownerName}
+                  </span>
+                )}
               </div>
 
               {/* AI Summary preview - always visible */}
