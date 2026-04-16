@@ -289,8 +289,18 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
 
     const activities: ActivityItem[] = [];
     const emptyAssociations = { companies: [], contacts: [], deals: [] };
-    // Owner ID를 임시 저장하기 위한 맵 (활동 ID -> owner ID)
-    const activityOwnerIds = new Map<string, string>();
+
+    // Owner 정보 조회 (ownerName 매핑용)
+    const ownersMap = new Map<string, string>();
+    try {
+      const ownersResponse = await hubspotClient.getOwners();
+      ownersResponse.results.forEach((owner: any) => {
+        const name = `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || owner.email || '(담당자 없음)';
+        ownersMap.set(owner.id, name);
+      });
+    } catch (error) {
+      console.error('Error fetching owners for timeline:', error);
+    }
 
     // HubSpot Search API를 사용하여 날짜 범위 내 활동을 서버사이드 필터링 + 페이지네이션
     // 검색 API로 활동 조회하는 헬퍼 함수 (페이지네이션 지원)
@@ -364,9 +374,6 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       for (const call of calls) {
         const timestamp = call.properties.hs_timestamp || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-        if (call.properties.hubspot_owner_id) {
-          activityOwnerIds.set(call.id, call.properties.hubspot_owner_id);
-        }
 
         activities.push({
           id: call.id,
@@ -414,9 +421,6 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       for (const note of notes) {
         const timestamp = note.properties.hs_timestamp || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-        if (note.properties.hubspot_owner_id) {
-          activityOwnerIds.set(note.id, note.properties.hubspot_owner_id);
-        }
 
         activities.push({
           id: note.id,
@@ -464,9 +468,6 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       for (const meeting of meetings) {
         const timestamp = meeting.properties.hs_meeting_start_time || '';
         const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-        if (meeting.properties.hubspot_owner_id) {
-          activityOwnerIds.set(meeting.id, meeting.properties.hubspot_owner_id);
-        }
 
         // 미팅 본문과 내부 노트를 합침
         const meetingBody = meeting.properties.hs_meeting_body || '';
@@ -545,28 +546,6 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
     }
 
     console.log(`[Activity Search] Total activities found: ${activities.length}`);
-
-    // Owner 이름 매핑
-    if (activityOwnerIds.size > 0) {
-      try {
-        const ownersResponse = await hubspotClient.getOwners();
-        const timelineOwnersMap = new Map<string, string>();
-        ownersResponse.results.forEach((owner: any) => {
-          const name = `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || owner.email || '(담당자 없음)';
-          timelineOwnersMap.set(owner.id, name);
-        });
-
-        activities.forEach(a => {
-          const ownerId = activityOwnerIds.get(a.id);
-          if (ownerId) {
-            a.ownerName = timelineOwnersMap.get(ownerId);
-          }
-        });
-        console.log(`[Activity Search] Owner names resolved for ${activityOwnerIds.size} activities`);
-      } catch (error) {
-        console.error('Error fetching owners for timeline:', error);
-      }
-    }
 
     // Association 및 댓글 조회 (선택적, generateSummaries 요청 시에만)
     const shouldFetchAssociations = req.query.includeAssociations === 'true' || generateSummaries === 'true';
