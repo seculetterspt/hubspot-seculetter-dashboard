@@ -293,7 +293,7 @@ export default function ActivityTimelinePage() {
                 {activity.ownerName && (
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-xs flex-shrink-0">
                     <User size={10} />
-                    {activity.ownerName}
+                    {activity.type === 'meeting' ? `주최: ${activity.ownerName}` : activity.ownerName}
                   </span>
                 )}
               </div>
