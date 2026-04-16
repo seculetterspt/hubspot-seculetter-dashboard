@@ -375,6 +375,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: call.properties.hs_call_body || '',
           timestamp,
           date,
+          ownerName: call.properties.hubspot_owner_id ? ownersMap.get(call.properties.hubspot_owner_id) || undefined : undefined,
           associations: emptyAssociations,
           comments: []
         });
@@ -391,7 +392,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
         for (const call of filteredCalls) {
           const timestamp = call.properties.hs_timestamp || '';
           const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-          activities.push({ id: call.id, type: 'call', title: call.properties.hs_call_title || '(제목 없음)', body: call.properties.hs_call_body || '', timestamp, date, associations: emptyAssociations, comments: [] });
+          activities.push({ id: call.id, type: 'call', title: call.properties.hs_call_title || '(제목 없음)', body: call.properties.hs_call_body || '', timestamp, date, ownerName: call.properties.hubspot_owner_id ? ownersMap.get(call.properties.hubspot_owner_id) || undefined : undefined, associations: emptyAssociations, comments: [] });
         }
         console.log(`[Activity Search] Calls fallback: ${filteredCalls.length}`);
       } catch (fallbackErr) {
@@ -424,6 +425,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: note.properties.hs_note_body || '',
           timestamp,
           date,
+          ownerName: note.properties.hubspot_owner_id ? ownersMap.get(note.properties.hubspot_owner_id) || undefined : undefined,
           associations: emptyAssociations,
           comments: []
         });
@@ -440,7 +442,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
         for (const note of filteredNotes) {
           const timestamp = note.properties.hs_timestamp || '';
           const date = timestamp ? new Date(timestamp).toISOString().split('T')[0] : '';
-          activities.push({ id: note.id, type: 'note', title: '메모', body: note.properties.hs_note_body || '', timestamp, date, associations: emptyAssociations, comments: [] });
+          activities.push({ id: note.id, type: 'note', title: '메모', body: note.properties.hs_note_body || '', timestamp, date, ownerName: note.properties.hubspot_owner_id ? ownersMap.get(note.properties.hubspot_owner_id) || undefined : undefined, associations: emptyAssociations, comments: [] });
         }
         console.log(`[Activity Search] Notes fallback: ${filteredNotes.length}`);
       } catch (fallbackErr) {
@@ -480,6 +482,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: combinedBody || '',
           timestamp,
           date,
+          ownerName: meeting.properties.hubspot_owner_id ? ownersMap.get(meeting.properties.hubspot_owner_id) || undefined : undefined,
           associations: emptyAssociations,
           comments: []
         });
@@ -499,7 +502,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           const meetingBody = meeting.properties.hs_meeting_body || '';
           const internalNotes = meeting.properties.hs_internal_meeting_notes || '';
           const combinedBody = internalNotes ? `${meetingBody}\n\n[내부 노트]\n${internalNotes}` : meetingBody;
-          activities.push({ id: meeting.id, type: 'meeting', title: meeting.properties.hs_meeting_title || '(제목 없음)', body: combinedBody || '', timestamp, date, associations: emptyAssociations, comments: [] });
+          activities.push({ id: meeting.id, type: 'meeting', title: meeting.properties.hs_meeting_title || '(제목 없음)', body: combinedBody || '', timestamp, date, ownerName: meeting.properties.hubspot_owner_id ? ownersMap.get(meeting.properties.hubspot_owner_id) || undefined : undefined, associations: emptyAssociations, comments: [] });
         }
         console.log(`[Activity Search] Meetings fallback: ${filteredMeetings.length}`);
       } catch (fallbackErr) {
@@ -514,7 +517,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
       const emails = await searchActivities(
         'emails',
         'hs_timestamp',
-        ['hs_email_subject', 'hs_email_text', 'hs_email_direction', 'hs_timestamp']
+        ['hs_email_subject', 'hs_email_text', 'hs_email_direction', 'hs_timestamp', 'hubspot_owner_id']
       );
       console.log(`[Activity Search] Emails found: ${emails.length}`);
 
@@ -529,6 +532,7 @@ router.get('/activity-timeline', async (req: Request, res: Response) => {
           body: email.properties.hs_email_text || '',
           timestamp,
           date,
+          ownerName: email.properties.hubspot_owner_id ? ownersMap.get(email.properties.hubspot_owner_id) || undefined : undefined,
           associations: emptyAssociations,
           comments: []
         });
