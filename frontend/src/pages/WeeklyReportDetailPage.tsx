@@ -53,13 +53,13 @@ const getActivityUrl = (type: string, id: string) => {
 
 function renderMarkdown(content: string): string {
   return content
-    .replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold text-gray-900 mt-4 mb-2">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold text-gray-900 mt-5 mb-3">$2</h2>')
+    .replace(/^### (.+)$/gm, '<h3 class="text-base font-semibold text-gray-900 mt-3 mb-1">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="text-lg font-bold text-gray-900 mt-4 mb-2">$2</h2>')
     .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>')
-    .replace(/^- (.+)$/gm, '<li class="ml-4 text-gray-700">$1</li>')
-    .replace(/(<li.*<\/li>\n?)+/g, '<ul class="list-disc space-y-1 my-2">$&</ul>')
-    .replace(/\n\n/g, '<br/><br/>')
-    .replace(/\n/g, '<br/>')
+    .replace(/^- (.+)$/gm, '<li class="ml-4 text-gray-700 leading-relaxed">$1</li>')
+    .replace(/(<li.*<\/li>\n?)+/g, '<ul class="list-disc space-y-0.5 my-1">$&</ul>')
+    .replace(/\n\n/g, '<br/>')
+    .replace(/\n/g, '')
 }
 
 export default function WeeklyReportDetailPage() {
