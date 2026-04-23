@@ -19,6 +19,46 @@ interface RelatedActivity {
 }
 
 // ─────────────────────────────────────────────
+// 디버그: DB 상태 확인
+// ─────────────────────────────────────────────
+router.get('/debug/status', async (req: Request, res: Response) => {
+  try {
+    if (!process.env.DATABASE_URL) {
+      return res.json({ error: 'DATABASE_URL not set' });
+    }
+
+    // 테이블 존재 확인
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'weekly_reports'
+      );
+    `);
+
+    // 데이터 개수 확인
+    let count = 0;
+    let latestRecord = null;
+    if (tableCheck.rows[0].exists) {
+      const countResult = await pool.query('SELECT COUNT(*) FROM weekly_reports');
+      count = parseInt(countResult.rows[0].count);
+
+      if (count > 0) {
+        const latest = await pool.query('SELECT id, report_date, team_name, created_at FROM weekly_reports ORDER BY created_at DESC LIMIT 1');
+        latestRecord = latest.rows[0];
+      }
+    }
+
+    res.json({
+      tableExists: tableCheck.rows[0].exists,
+      recordCount: count,
+      latestRecord
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─────────────────────────────────────────────
 // 주간보고 목록 조회
 // ─────────────────────────────────────────────
 router.get('/', async (req: Request, res: Response) => {
