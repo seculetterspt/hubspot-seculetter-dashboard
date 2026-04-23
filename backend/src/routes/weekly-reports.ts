@@ -107,13 +107,13 @@ JSON 형식으로 응답:
     const companies: string[] = extracted.companies || [];
     const keywords: string[] = extracted.keywords || [];
 
-    // Step 2: HubSpot에서 관련 활동 검색 (최근 2주)
+    // Step 2: HubSpot에서 관련 활동 검색 (최근 3개월)
     const relatedActivities: RelatedActivity[] = [];
-    const twoWeeksAgo = new Date();
-    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
 
     // 회사별로 활동 검색
-    for (const companyName of companies.slice(0, 5)) { // 최대 5개 회사
+    for (const companyName of companies.slice(0, 10)) { // 최대 10개 회사
       try {
         // 회사 검색
         const companyResults = await hubspotClient.searchCompanies(companyName, 1);
@@ -140,14 +140,14 @@ JSON 형식으로 응답:
               );
 
               const meetingDate = new Date(meeting.properties.hs_meeting_start_time || '');
-              if (meetingDate >= twoWeeksAgo) {
+              if (meetingDate >= threeMonthsAgo) {
                 relatedActivities.push({
                   id: meeting.id,
                   type: 'meeting',
                   title: meeting.properties.hs_meeting_title || '(제목 없음)',
                   timestamp: meeting.properties.hs_meeting_start_time || '',
                   companyName,
-                  summary: meeting.properties.hs_meeting_body?.substring(0, 200) || ''
+                  summary: meeting.properties.hs_meeting_body?.substring(0, 500) || ''
                 });
               }
             } catch (e) {
@@ -177,14 +177,14 @@ JSON 형식으로 응답:
               );
 
               const callDate = new Date(call.properties.hs_timestamp || '');
-              if (callDate >= twoWeeksAgo) {
+              if (callDate >= threeMonthsAgo) {
                 relatedActivities.push({
                   id: call.id,
                   type: 'call',
                   title: call.properties.hs_call_title || '(제목 없음)',
                   timestamp: call.properties.hs_timestamp || '',
                   companyName,
-                  summary: call.properties.hs_call_body?.substring(0, 200) || ''
+                  summary: call.properties.hs_call_body?.substring(0, 500) || ''
                 });
               }
             } catch (e) {
@@ -214,14 +214,14 @@ JSON 형식으로 응답:
               );
 
               const noteDate = new Date(note.properties.hs_timestamp || '');
-              if (noteDate >= twoWeeksAgo) {
+              if (noteDate >= threeMonthsAgo) {
                 relatedActivities.push({
                   id: note.id,
                   type: 'note',
                   title: '메모',
                   timestamp: note.properties.hs_timestamp || '',
                   companyName,
-                  summary: note.properties.hs_note_body?.substring(0, 200) || ''
+                  summary: note.properties.hs_note_body?.substring(0, 500) || ''
                 });
               }
             } catch (e) {
@@ -230,6 +230,46 @@ JSON 형식으로 응답:
           }
         } catch (e) {
           // 노트 연결 조회 실패 무시
+        }
+
+        // 회사에 연결된 딜(거래) 정보 조회
+        try {
+          const dealAssoc = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
+            'companies',
+            companyId,
+            'deals',
+            undefined,
+            5
+          );
+
+          for (const assoc of dealAssoc.results || []) {
+            try {
+              const deal = await hubspotClient.api.crm.deals.basicApi.getById(
+                assoc.toObjectId,
+                ['dealname', 'amount', 'dealstage', 'closedate', 'pipeline', 'notes_last_updated']
+              );
+
+              const amount = deal.properties.amount ? parseInt(deal.properties.amount) : 0;
+              const amountStr = amount >= 100000000
+                ? `${(amount / 100000000).toFixed(1)}억원`
+                : amount >= 10000
+                  ? `${(amount / 10000).toFixed(0)}만원`
+                  : amount > 0 ? `${amount.toLocaleString()}원` : '';
+
+              relatedActivities.push({
+                id: deal.id,
+                type: 'note', // 딜은 note 타입으로 표시
+                title: `[딜] ${deal.properties.dealname || '(거래명 없음)'}`,
+                timestamp: deal.properties.notes_last_updated || deal.properties.closedate || new Date().toISOString(),
+                companyName,
+                summary: `금액: ${amountStr || '미정'}, 예상종료: ${deal.properties.closedate || '미정'}`
+              });
+            } catch (e) {
+              // 개별 딜 조회 실패 무시
+            }
+          }
+        } catch (e) {
+          // 딜 연결 조회 실패 무시
         }
 
       } catch (e) {
@@ -241,44 +281,51 @@ JSON 형식으로 응답:
     const uniqueActivities = relatedActivities
       .filter((a, i, arr) => arr.findIndex(x => x.id === a.id) === i)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, 10); // 최대 10개
+      .slice(0, 20); // 최대 20개
 
     // Step 3: CEO 보고용 보고서 생성
     const activityContext = uniqueActivities.length > 0
-      ? `\n\n[참고: HubSpot에서 발견된 관련 활동]\n${uniqueActivities.map(a =>
-          `- ${a.companyName}: ${a.type === 'meeting' ? '미팅' : a.type === 'call' ? '전화' : '메모'} - ${a.title}${a.summary ? ` (${a.summary.substring(0, 100)}...)` : ''}`
-        ).join('\n')}`
+      ? `\n\n[중요: HubSpot CRM에서 찾은 실제 활동 기록 - 반드시 보고서에 반영할 것]\n${uniqueActivities.map(a =>
+          `■ ${a.companyName} (${a.type === 'meeting' ? '미팅' : a.type === 'call' ? '전화' : '메모'})
+  제목: ${a.title}
+  내용: ${a.summary || '(내용 없음)'}`
+        ).join('\n\n')}`
       : '';
 
     const generatePrompt = `당신은 B2B 보안 솔루션 회사 "시큐레터"의 ${teamName} 주간보고를 작성하는 담당자입니다.
 
-아래 간략 내용을 CEO 보고용으로 전문적이고 풍성하게 작성하세요.
-
-[간략 내용]
+[사용자 입력 - 간략 내용]
 ${briefContent}
 ${activityContext}
 
+[핵심 지시]
+1. 사용자가 입력한 간략 내용을 기반으로 작성
+2. **HubSpot 활동 기록이 있으면 해당 내용을 반드시 보고서에 추가** (미팅 내용, 논의 사항, 합의 내용 등)
+3. HubSpot 활동에서 발견된 구체적인 정보(금액, 일정, 담당자, 기술 세부사항 등)를 보고서에 포함
+
 [작성 규칙]
-1. 거짓말이나 과장은 절대 금지 - 입력된 내용과 HubSpot 활동 기반으로만 작성
-2. CEO가 빠르게 파악할 수 있도록 핵심 위주로 간결하게
-3. 각 회사별로 구분하여 불렛 포인트로 작성
-4. 진행 상황, 다음 단계, 예상 일정을 명확히 표기
-5. 금액이나 규모가 있으면 포함
-6. 한국어로 작성
-7. 마크다운 형식으로 작성
+1. 거짓말이나 과장 절대 금지
+2. CEO가 빠르게 스캔할 수 있도록 핵심만 간결하게
+3. 각 회사별 ### 제목, 각 내용은 개별 불렛(-)으로
+4. 한 불렛에 한 가지 내용만 (긴 문장은 여러 불렛으로 분리)
+5. 명사형 종결 필수 ("~완료", "~예정", "~진행 중", "~검토 중")
+6. "~니다", "~습니다" 문장 종결 절대 금지
+7. 버전/수치 변경은 화살표 사용 (예: 3.0.2 → 3.0.19)
+8. 금액/일정이 있으면 괄호로 표기 (예: 제안서 제출 예정 (4월 중))
 
 [형식 예시]
-### 한국투자증권
-- **현황**: POC 진행 중
-- **진행상황**: 시나리오 자료 전달 완료
-- **다음단계**: 차주 고객사 미팅 예정
+### 대신증권
+- 시스템 패치 및 취약점 조치 완료
+- 버전 업그레이드: 2.5.5.12 → 2.5.5.13
+- CVE-2025-11187 취약점 조치 완료
+- 시스템 안정성 모니터링 예정
 
-### 법무부
-- **현황**: 제품 시연 완료
-- **진행상황**: 긍정적 반응 확인
-- **다음단계**: 제안서 제출 예정
-
-(위 형식으로 각 회사별 작성)`;
+### 푸본현대생명
+- CDR 제품 소개 미팅 완료
+- 2027년 제품 도입 검토 중
+- 현 솔루션 불만족 → 시큐레터 CDR 추가 검토 중
+- 제안 발표 준비 필요
+- 커스터마이징 요구 대응 준비 예정`;
 
     const generateResponse = await openai.chat.completions.create({
       model: 'gpt-4o',
