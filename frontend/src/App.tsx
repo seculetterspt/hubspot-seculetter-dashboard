@@ -6,7 +6,9 @@ import ActivityTimelinePage from './pages/ActivityTimelinePage'
 import DealSummaryPage from './pages/DealSummaryPage'
 import MeetingLogPage from './pages/MeetingLogPage'
 import MeetingRecordsPage from './pages/MeetingRecordsPage'
-import WeeklyMeetingPage from './pages/WeeklyMeetingPage'
+import WeeklyReportListPage from './pages/WeeklyReportListPage'
+import WeeklyReportNewPage from './pages/WeeklyReportNewPage'
+import WeeklyReportDetailPage from './pages/WeeklyReportDetailPage'
 
 function ProtectedLayout() {
   return (
@@ -30,7 +32,9 @@ function App() {
         <Route path="/meeting/new" element={<MeetingLogPage />} />
         <Route path="/meeting/records" element={<MeetingRecordsPage />} />
         <Route path="/deals" element={<DealSummaryPage />} />
-        <Route path="/weekly" element={<WeeklyMeetingPage />} />
+        <Route path="/weekly" element={<WeeklyReportListPage />} />
+        <Route path="/weekly/new" element={<WeeklyReportNewPage />} />
+        <Route path="/weekly/:id" element={<WeeklyReportDetailPage />} />
       </Route>
     </Routes>
   )
