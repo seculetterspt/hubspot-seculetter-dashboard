@@ -10,6 +10,7 @@ import analyticsRouter from './routes/analytics.js';
 import snapshotRouter from './routes/snapshot.js';
 import meetingsRouter from './routes/meetings.js';
 import weeklyMeetingsRouter from './routes/weekly-meetings.js';
+import weeklyReportsRouter from './routes/weekly-reports.js';
 import authRouter from './routes/auth.js';
 import { isAuthenticated, validateSession } from './middleware/auth.js';
 import { snapshotService } from './services/snapshot/SnapshotService.js';
@@ -58,6 +59,7 @@ app.use('/api/analytics', isAuthenticated, analyticsRouter);
 app.use('/api/snapshot', isAuthenticated, snapshotRouter);
 app.use('/api/meetings', isAuthenticated, meetingsRouter);
 app.use('/api/weekly-meetings', isAuthenticated, weeklyMeetingsRouter);
+app.use('/api/weekly-reports', isAuthenticated, weeklyReportsRouter);
 
 // 6. Static files (comes after auth routes)
 const publicPath = path.join(process.cwd(), 'public');

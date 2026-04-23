@@ -351,6 +351,22 @@ export async function initDatabase(): Promise<void> {
 
       CREATE INDEX IF NOT EXISTS IDX_weekly_meetings_date ON "weekly_meetings" ("meeting_date" DESC);
       CREATE INDEX IF NOT EXISTS IDX_weekly_meetings_created_by ON "weekly_meetings" ("created_by");
+
+      -- 주간보고 테이블 (CEO 보고용)
+      CREATE TABLE IF NOT EXISTS "weekly_reports" (
+        "id" SERIAL PRIMARY KEY,
+        "report_date" DATE NOT NULL,
+        "team_name" VARCHAR(100) NOT NULL,
+        "brief_content" TEXT,
+        "generated_content" TEXT NOT NULL,
+        "related_activities" JSONB DEFAULT '[]',
+        "created_by" VARCHAR(255),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS IDX_weekly_reports_date ON "weekly_reports" ("report_date" DESC);
+      CREATE INDEX IF NOT EXISTS IDX_weekly_reports_team ON "weekly_reports" ("team_name");
     `);
     console.log('Database initialized successfully');
   } finally {
