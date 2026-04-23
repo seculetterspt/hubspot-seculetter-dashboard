@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Calendar, Users, Loader2, ExternalLink, Phone, Mail, FileText, Trash2, Copy, Check } from 'lucide-react'
+import { ArrowLeft, Calendar, Users, Loader2, ExternalLink, Phone, Mail, FileText, Trash2, Copy, Check, Edit, Save, X } from 'lucide-react'
 import { api } from '../services/api'
 
 interface RelatedActivity {
@@ -51,12 +51,26 @@ const getActivityUrl = (type: string, id: string) => {
   }/${id}`
 }
 
+function renderMarkdown(content: string): string {
+  return content
+    .replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold text-gray-900 mt-4 mb-2">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold text-gray-900 mt-5 mb-3">$2</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>')
+    .replace(/^- (.+)$/gm, '<li class="ml-4 text-gray-700">$1</li>')
+    .replace(/(<li.*<\/li>\n?)+/g, '<ul class="list-disc space-y-1 my-2">$&</ul>')
+    .replace(/\n\n/g, '<br/><br/>')
+    .replace(/\n/g, '<br/>')
+}
+
 export default function WeeklyReportDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [report, setReport] = useState<WeeklyReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     const loadReport = async () => {
@@ -64,6 +78,7 @@ export default function WeeklyReportDetailPage() {
         setLoading(true)
         const res = await api.get(`/weekly-reports/${id}`)
         setReport(res.data.report)
+        setEditContent(res.data.report?.generated_content || '')
       } catch (error) {
         console.error('Failed to load report:', error)
       } finally {
@@ -97,6 +112,34 @@ export default function WeeklyReportDetailPage() {
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
       console.error('Failed to copy:', error)
+    }
+  }
+
+  const handleEdit = () => {
+    setEditContent(report?.generated_content || '')
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditContent(report?.generated_content || '')
+  }
+
+  const handleSave = async () => {
+    if (!report) return
+
+    try {
+      setSaving(true)
+      await api.put(`/weekly-reports/${id}`, {
+        generatedContent: editContent
+      })
+      setReport({ ...report, generated_content: editContent })
+      setIsEditing(false)
+    } catch (error) {
+      console.error('Failed to save:', error)
+      alert('저장 실패')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -146,41 +189,71 @@ export default function WeeklyReportDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
-          >
-            {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
-            {copied ? '복사됨' : '복사'}
-          </button>
-          <button
-            onClick={handleDelete}
-            className="flex items-center gap-1.5 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
-          >
-            <Trash2 size={16} />
-            삭제
-          </button>
+          {isEditing ? (
+            <>
+              <button
+                onClick={handleCancelEdit}
+                className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+              >
+                <X size={16} />
+                취소
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
+              >
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                저장
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleEdit}
+                className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+              >
+                <Edit size={16} />
+                수정
+              </button>
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+              >
+                {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
+                {copied ? '복사됨' : '복사'}
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-1.5 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
+              >
+                <Trash2 size={16} />
+                삭제
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* CEO Report */}
+        <div className="lg:col-span-2">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="font-semibold text-gray-900 mb-4">CEO 보고 내용</h2>
-            <div className="prose prose-sm max-w-none">
-              <div
-                className="whitespace-pre-wrap text-gray-800 leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: report.generated_content.replace(/\n/g, '<br/>') }}
-              />
-            </div>
-          </div>
 
-          {/* Original Input */}
-          <div className="bg-gray-50 rounded-xl border border-gray-200 p-6">
-            <h2 className="font-semibold text-gray-700 mb-3 text-sm">원본 입력 내용</h2>
-            <p className="text-sm text-gray-600 whitespace-pre-wrap">{report.brief_content}</p>
+            {isEditing ? (
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="w-full h-96 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none font-mono text-sm"
+                placeholder="마크다운 형식으로 작성하세요..."
+              />
+            ) : (
+              <div
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(report.generated_content) }}
+              />
+            )}
           </div>
         </div>
 

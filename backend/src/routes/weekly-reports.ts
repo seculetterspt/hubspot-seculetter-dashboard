@@ -261,16 +261,22 @@ ${activityContext}
 [작성 규칙]
 1. 거짓말이나 과장은 절대 금지 - 입력된 내용과 HubSpot 활동 기반으로만 작성
 2. CEO가 빠르게 파악할 수 있도록 핵심 위주로 간결하게
-3. 각 회사별로 구분하여 작성
+3. 각 회사별로 구분하여 불렛 포인트로 작성
 4. 진행 상황, 다음 단계, 예상 일정을 명확히 표기
 5. 금액이나 규모가 있으면 포함
 6. 한국어로 작성
+7. 마크다운 형식으로 작성
 
-[형식]
-■ [회사명]
-  - 현황: ...
-  - 진행상황: ...
-  - 다음단계: ...
+[형식 예시]
+### 한국투자증권
+- **현황**: POC 진행 중
+- **진행상황**: 시나리오 자료 전달 완료
+- **다음단계**: 차주 고객사 미팅 예정
+
+### 법무부
+- **현황**: 제품 시연 완료
+- **진행상황**: 긍정적 반응 확인
+- **다음단계**: 제안서 제출 예정
 
 (위 형식으로 각 회사별 작성)`;
 
@@ -333,6 +339,44 @@ router.post('/', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error saving weekly report:', error);
     res.status(500).json({ error: 'Failed to save weekly report' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// 주간보고 수정
+// ─────────────────────────────────────────────
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { generatedContent } = req.body;
+
+    if (!generatedContent) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+
+    if (!process.env.DATABASE_URL) {
+      return res.status(400).json({ error: 'Database not configured' });
+    }
+
+    const result = await pool.query(
+      `UPDATE weekly_reports
+       SET generated_content = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING id, report_date, team_name, generated_content, updated_at`,
+      [generatedContent, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    res.json({
+      success: true,
+      report: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating weekly report:', error);
+    res.status(500).json({ error: 'Failed to update weekly report' });
   }
 });
 
