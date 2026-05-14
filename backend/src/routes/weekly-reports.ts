@@ -298,7 +298,7 @@ JSON 형식으로 응답:
 
               relatedActivities.push({
                 id: deal.id,
-                type: 'note', // 딜은 note 타입으로 표시
+                type: 'deal',
                 title: `[딜] ${deal.properties.dealname || '(거래명 없음)'}`,
                 timestamp: deal.properties.notes_last_updated || deal.properties.closedate || new Date().toISOString(),
                 companyName,
