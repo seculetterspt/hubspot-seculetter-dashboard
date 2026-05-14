@@ -298,7 +298,7 @@ JSON 형식으로 응답:
 
               relatedActivities.push({
                 id: deal.id,
-                type: 'note', // 딜은 note 타입으로 표시
+                type: 'deal',
                 title: `[딜] ${deal.properties.dealname || '(거래명 없음)'}`,
                 timestamp: deal.properties.notes_last_updated || deal.properties.closedate || new Date().toISOString(),
                 companyName,
@@ -325,7 +325,7 @@ JSON 형식으로 응답:
 
     // Step 3: CEO 보고용 보고서 생성
     const activityContext = uniqueActivities.length > 0
-      ? `\n\n[중요: HubSpot CRM에서 찾은 실제 활동 기록 - 반드시 보고서에 반영할 것]\n${uniqueActivities.map(a =>
+      ? `\n\n[참고: HubSpot CRM 활동 기록 - 원문 내용과 관련 있는 경우에만 활용]\n${uniqueActivities.map(a =>
           `■ ${a.companyName} (${a.type === 'meeting' ? '미팅' : a.type === 'call' ? '전화' : '메모'})
   제목: ${a.title}
   내용: ${a.summary || '(내용 없음)'}`
@@ -334,17 +334,18 @@ JSON 형식으로 응답:
 
     const generatePrompt = `당신은 B2B 보안 솔루션 회사 "시큐레터"의 ${teamName} 주간보고를 작성하는 담당자입니다.
 
-[사용자 입력 - 간략 내용]
+[사용자가 작성한 원문 - 이것이 가장 중요함]
 ${briefContent}
 ${activityContext}
 
 [핵심 지시]
-1. 사용자가 입력한 간략 내용을 기반으로 작성
-2. **HubSpot 활동 기록이 있으면 해당 내용을 반드시 보고서에 추가** (미팅 내용, 논의 사항, 합의 내용 등)
-3. HubSpot 활동에서 발견된 구체적인 정보(금액, 일정, 담당자, 기술 세부사항 등)를 보고서에 포함
+1. **사용자 원문이 가장 중요** - 원문에 있는 모든 내용을 빠짐없이 포함
+2. 원문의 맥락과 의도를 살려서 CEO 보고용으로 정리
+3. HubSpot 활동은 원문 내용을 "보강"하는 용도로만 사용 (원문과 무관한 과거 데이터는 제외)
+4. 원문에 언급된 회사/내용과 직접 관련된 HubSpot 정보만 추가 (금액, 일정 등)
 
 [작성 규칙]
-1. 거짓말이나 과장 절대 금지
+1. 원문 내용 누락 금지 - 원문에 있는 모든 회사와 내용 포함
 2. CEO가 빠르게 스캔할 수 있도록 핵심만 간결하게
 3. 각 회사별 ### 제목, 각 내용은 개별 불렛(-)으로
 4. 한 불렛에 한 가지 내용만 (긴 문장은 여러 불렛으로 분리)
@@ -370,8 +371,8 @@ ${activityContext}
     const generateResponse = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [{ role: 'user', content: generatePrompt }],
-      temperature: 0.3,
-      max_tokens: 2000,
+      temperature: 0.6,
+      max_tokens: 3000,
     });
 
     const generatedContent = generateResponse.choices[0]?.message?.content || briefContent;

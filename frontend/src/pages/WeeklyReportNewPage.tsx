@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Sparkles, Save, Loader2, Calendar, Users, FileText, ExternalLink, Phone, Mail } from 'lucide-react'
+import { ArrowLeft, Sparkles, Save, Loader2, Calendar, Users, FileText, ExternalLink, Phone, Mail, DollarSign } from 'lucide-react'
 import { api } from '../services/api'
 
 interface RelatedActivity {
   id: string
-  type: 'call' | 'note' | 'meeting' | 'email'
+  type: 'call' | 'note' | 'meeting' | 'email' | 'deal'
   title: string
   timestamp: string
   companyName?: string
@@ -32,14 +32,14 @@ const getActivityIcon = (type: string) => {
     case 'call': return <Phone size={14} className="text-blue-600" />
     case 'meeting': return <Calendar size={14} className="text-purple-600" />
     case 'email': return <Mail size={14} className="text-orange-600" />
+    case 'deal': return <DollarSign size={14} className="text-emerald-600" />
     default: return <FileText size={14} className="text-green-600" />
   }
 }
 
 const getActivityUrl = (type: string, id: string) => {
-  return `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/record/0-${
-    type === 'call' ? '48' : type === 'meeting' ? '47' : type === 'email' ? '49' : '46'
-  }/${id}`
+  const objectTypeId = type === 'deal' ? '3' : type === 'call' ? '48' : type === 'meeting' ? '47' : type === 'email' ? '49' : '46'
+  return `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/record/0-${objectTypeId}/${id}`
 }
 
 export default function WeeklyReportNewPage() {
