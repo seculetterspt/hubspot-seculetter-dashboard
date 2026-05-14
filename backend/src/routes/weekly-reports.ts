@@ -11,7 +11,7 @@ const openai = new OpenAI({
 
 interface RelatedActivity {
   id: string;
-  type: 'call' | 'note' | 'meeting' | 'email';
+  type: 'call' | 'note' | 'meeting' | 'email' | 'deal';
   title: string;
   timestamp: string;
   companyName?: string;
