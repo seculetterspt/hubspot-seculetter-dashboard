@@ -148,174 +148,208 @@ JSON 형식으로 응답:
     const keywords: string[] = extracted.keywords || [];
 
     // Step 2: HubSpot에서 관련 활동 검색 (최근 3개월)
-    const relatedActivities: RelatedActivity[] = [];
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
 
-    // 회사별로 활동 검색
-    for (const companyName of companies.slice(0, 10)) { // 최대 10개 회사
+    // 회사별 활동 조회 — 회사/객체종류/개별객체 3단계를 모두 병렬(Promise.all)로 처리해 타임아웃 방지
+    const fetchCompanyActivities = async (companyName: string): Promise<RelatedActivity[]> => {
       try {
         // 회사 검색
         const companyResults = await hubspotClient.searchCompanies(companyName, 1);
-        if (companyResults.length === 0) continue;
+        if (companyResults.length === 0) return [];
 
         const companyId = companyResults[0].id;
 
         // 회사에 연결된 미팅 조회
-        try {
-          const meetingAssoc = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
-            'companies',
-            companyId,
-            'meetings',
-            undefined,
-            5
-          );
+        const fetchMeetings = async (): Promise<RelatedActivity[]> => {
+          try {
+            const meetingAssoc = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
+              'companies',
+              companyId,
+              'meetings',
+              undefined,
+              5
+            );
 
-          for (const assoc of meetingAssoc.results || []) {
-            try {
-              const meeting = await hubspotClient.api.crm.objects.basicApi.getById(
-                'meetings',
-                assoc.toObjectId,
-                ['hs_meeting_title', 'hs_meeting_start_time', 'hs_meeting_body']
-              );
+            const results = await Promise.all((meetingAssoc.results || []).map(async (assoc): Promise<RelatedActivity | null> => {
+              try {
+                const meeting = await hubspotClient.api.crm.objects.basicApi.getById(
+                  'meetings',
+                  assoc.toObjectId,
+                  ['hs_meeting_title', 'hs_meeting_start_time', 'hs_meeting_body']
+                );
 
-              const meetingDate = new Date(meeting.properties.hs_meeting_start_time || '');
-              if (meetingDate >= threeMonthsAgo) {
-                relatedActivities.push({
-                  id: meeting.id,
-                  type: 'meeting',
-                  title: meeting.properties.hs_meeting_title || '(제목 없음)',
-                  timestamp: meeting.properties.hs_meeting_start_time || '',
-                  companyName,
-                  summary: meeting.properties.hs_meeting_body?.substring(0, 500) || ''
-                });
+                const meetingDate = new Date(meeting.properties.hs_meeting_start_time || '');
+                if (meetingDate >= threeMonthsAgo) {
+                  return {
+                    id: meeting.id,
+                    type: 'meeting' as const,
+                    title: meeting.properties.hs_meeting_title || '(제목 없음)',
+                    timestamp: meeting.properties.hs_meeting_start_time || '',
+                    companyName,
+                    summary: meeting.properties.hs_meeting_body?.substring(0, 500) || ''
+                  };
+                }
+              } catch (e) {
+                // 개별 미팅 조회 실패 무시
               }
-            } catch (e) {
-              // 개별 미팅 조회 실패 무시
-            }
+              return null;
+            }));
+            return results.filter((a): a is RelatedActivity => a !== null);
+          } catch (e) {
+            // 미팅 연결 조회 실패 무시
+            return [];
           }
-        } catch (e) {
-          // 미팅 연결 조회 실패 무시
-        }
+        };
 
         // 회사에 연결된 전화 조회
-        try {
-          const callAssoc = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
-            'companies',
-            companyId,
-            'calls',
-            undefined,
-            3
-          );
+        const fetchCalls = async (): Promise<RelatedActivity[]> => {
+          try {
+            const callAssoc = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
+              'companies',
+              companyId,
+              'calls',
+              undefined,
+              3
+            );
 
-          for (const assoc of callAssoc.results || []) {
-            try {
-              const call = await hubspotClient.api.crm.objects.basicApi.getById(
-                'calls',
-                assoc.toObjectId,
-                ['hs_call_title', 'hs_timestamp', 'hs_call_body']
-              );
+            const results = await Promise.all((callAssoc.results || []).map(async (assoc): Promise<RelatedActivity | null> => {
+              try {
+                const call = await hubspotClient.api.crm.objects.basicApi.getById(
+                  'calls',
+                  assoc.toObjectId,
+                  ['hs_call_title', 'hs_timestamp', 'hs_call_body']
+                );
 
-              const callDate = new Date(call.properties.hs_timestamp || '');
-              if (callDate >= threeMonthsAgo) {
-                relatedActivities.push({
-                  id: call.id,
-                  type: 'call',
-                  title: call.properties.hs_call_title || '(제목 없음)',
-                  timestamp: call.properties.hs_timestamp || '',
-                  companyName,
-                  summary: call.properties.hs_call_body?.substring(0, 500) || ''
-                });
+                const callDate = new Date(call.properties.hs_timestamp || '');
+                if (callDate >= threeMonthsAgo) {
+                  return {
+                    id: call.id,
+                    type: 'call' as const,
+                    title: call.properties.hs_call_title || '(제목 없음)',
+                    timestamp: call.properties.hs_timestamp || '',
+                    companyName,
+                    summary: call.properties.hs_call_body?.substring(0, 500) || ''
+                  };
+                }
+              } catch (e) {
+                // 개별 전화 조회 실패 무시
               }
-            } catch (e) {
-              // 개별 전화 조회 실패 무시
-            }
+              return null;
+            }));
+            return results.filter((a): a is RelatedActivity => a !== null);
+          } catch (e) {
+            // 전화 연결 조회 실패 무시
+            return [];
           }
-        } catch (e) {
-          // 전화 연결 조회 실패 무시
-        }
+        };
 
         // 회사에 연결된 노트 조회
-        try {
-          const noteAssoc = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
-            'companies',
-            companyId,
-            'notes',
-            undefined,
-            3
-          );
+        const fetchNotes = async (): Promise<RelatedActivity[]> => {
+          try {
+            const noteAssoc = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
+              'companies',
+              companyId,
+              'notes',
+              undefined,
+              3
+            );
 
-          for (const assoc of noteAssoc.results || []) {
-            try {
-              const note = await hubspotClient.api.crm.objects.basicApi.getById(
-                'notes',
-                assoc.toObjectId,
-                ['hs_note_body', 'hs_timestamp']
-              );
+            const results = await Promise.all((noteAssoc.results || []).map(async (assoc): Promise<RelatedActivity | null> => {
+              try {
+                const note = await hubspotClient.api.crm.objects.basicApi.getById(
+                  'notes',
+                  assoc.toObjectId,
+                  ['hs_note_body', 'hs_timestamp']
+                );
 
-              const noteDate = new Date(note.properties.hs_timestamp || '');
-              if (noteDate >= threeMonthsAgo) {
-                relatedActivities.push({
-                  id: note.id,
-                  type: 'note',
-                  title: '메모',
-                  timestamp: note.properties.hs_timestamp || '',
-                  companyName,
-                  summary: note.properties.hs_note_body?.substring(0, 500) || ''
-                });
+                const noteDate = new Date(note.properties.hs_timestamp || '');
+                if (noteDate >= threeMonthsAgo) {
+                  return {
+                    id: note.id,
+                    type: 'note' as const,
+                    title: '메모',
+                    timestamp: note.properties.hs_timestamp || '',
+                    companyName,
+                    summary: note.properties.hs_note_body?.substring(0, 500) || ''
+                  };
+                }
+              } catch (e) {
+                // 개별 노트 조회 실패 무시
               }
-            } catch (e) {
-              // 개별 노트 조회 실패 무시
-            }
+              return null;
+            }));
+            return results.filter((a): a is RelatedActivity => a !== null);
+          } catch (e) {
+            // 노트 연결 조회 실패 무시
+            return [];
           }
-        } catch (e) {
-          // 노트 연결 조회 실패 무시
-        }
+        };
 
         // 회사에 연결된 딜(거래) 정보 조회
-        try {
-          const dealAssoc = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
-            'companies',
-            companyId,
-            'deals',
-            undefined,
-            5
-          );
+        const fetchDeals = async (): Promise<RelatedActivity[]> => {
+          try {
+            const dealAssoc = await hubspotClient.api.crm.associations.v4.basicApi.getPage(
+              'companies',
+              companyId,
+              'deals',
+              undefined,
+              5
+            );
 
-          for (const assoc of dealAssoc.results || []) {
-            try {
-              const deal = await hubspotClient.api.crm.deals.basicApi.getById(
-                assoc.toObjectId,
-                ['dealname', 'amount', 'dealstage', 'closedate', 'pipeline', 'notes_last_updated']
-              );
+            const results = await Promise.all((dealAssoc.results || []).map(async (assoc): Promise<RelatedActivity | null> => {
+              try {
+                const deal = await hubspotClient.api.crm.deals.basicApi.getById(
+                  assoc.toObjectId,
+                  ['dealname', 'amount', 'dealstage', 'closedate', 'pipeline', 'notes_last_updated']
+                );
 
-              const amount = deal.properties.amount ? parseInt(deal.properties.amount) : 0;
-              const amountStr = amount >= 100000000
-                ? `${(amount / 100000000).toFixed(1)}억원`
-                : amount >= 10000
-                  ? `${(amount / 10000).toFixed(0)}만원`
-                  : amount > 0 ? `${amount.toLocaleString()}원` : '';
+                const amount = deal.properties.amount ? parseInt(deal.properties.amount) : 0;
+                const amountStr = amount >= 100000000
+                  ? `${(amount / 100000000).toFixed(1)}억원`
+                  : amount >= 10000
+                    ? `${(amount / 10000).toFixed(0)}만원`
+                    : amount > 0 ? `${amount.toLocaleString()}원` : '';
 
-              relatedActivities.push({
-                id: deal.id,
-                type: 'deal',
-                title: `[딜] ${deal.properties.dealname || '(거래명 없음)'}`,
-                timestamp: deal.properties.notes_last_updated || deal.properties.closedate || new Date().toISOString(),
-                companyName,
-                summary: `금액: ${amountStr || '미정'}, 예상종료: ${deal.properties.closedate || '미정'}`
-              });
-            } catch (e) {
-              // 개별 딜 조회 실패 무시
-            }
+                return {
+                  id: deal.id,
+                  type: 'deal' as const,
+                  title: `[딜] ${deal.properties.dealname || '(거래명 없음)'}`,
+                  timestamp: deal.properties.notes_last_updated || deal.properties.closedate || new Date().toISOString(),
+                  companyName,
+                  summary: `금액: ${amountStr || '미정'}, 예상종료: ${deal.properties.closedate || '미정'}`
+                };
+              } catch (e) {
+                // 개별 딜 조회 실패 무시
+                return null;
+              }
+            }));
+            return results.filter((a): a is RelatedActivity => a !== null);
+          } catch (e) {
+            // 딜 연결 조회 실패 무시
+            return [];
           }
-        } catch (e) {
-          // 딜 연결 조회 실패 무시
-        }
+        };
 
+        // 객체 종류 4개를 병렬 조회 후 합치기
+        const [meetings, calls, notes, deals] = await Promise.all([
+          fetchMeetings(),
+          fetchCalls(),
+          fetchNotes(),
+          fetchDeals()
+        ]);
+        return [...meetings, ...calls, ...notes, ...deals];
       } catch (e) {
         console.error(`Error searching activities for ${companyName}:`, e);
+        return [];
       }
-    }
+    };
+
+    // 회사 최대 10개를 병렬 조회 후 평탄화
+    const companyActivityLists = await Promise.all(
+      companies.slice(0, 10).map(fetchCompanyActivities)
+    );
+    const relatedActivities: RelatedActivity[] = companyActivityLists.flat();
 
     // 중복 제거 및 시간순 정렬
     const uniqueActivities = relatedActivities
