@@ -12,18 +12,25 @@ export function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const error = searchParams.get('error');
+  // Where to send the user after login (e.g. a gated /reports/* page they tried to open)
+  const returnUrl = searchParams.get('returnUrl') || '/';
 
-  // If already authenticated, redirect to home
+  // If already authenticated, redirect to the requested page
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      navigate('/', { replace: true });
+      if (returnUrl.startsWith('/reports')) {
+        // Backend-served static page (outside the SPA) — use a full navigation
+        window.location.href = returnUrl;
+      } else {
+        navigate(returnUrl, { replace: true });
+      }
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, navigate, returnUrl]);
 
   const handleHubSpotLogin = () => {
     console.log('[LoginPage] Login button clicked');
     try {
-      authService.redirectToLogin('/');
+      authService.redirectToLogin(returnUrl);
     } catch (error) {
       console.error('[LoginPage] Login error:', error);
     }

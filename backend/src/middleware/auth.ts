@@ -71,3 +71,18 @@ export const validateSession = (req: Request, res: Response, next: NextFunction)
     next();
   }
 };
+
+/**
+ * Middleware to gate STATIC PAGE routes (e.g. /reports/*) behind a session.
+ * Unlike isAuthenticated (which returns 401 JSON for API calls), this issues a
+ * browser redirect to the login page and preserves the original URL as returnUrl
+ * so the user lands back on the requested report after HubSpot login.
+ */
+export const requirePageAuth = (req: Request, res: Response, next: NextFunction): void => {
+  if (req.session?.user) {
+    next();
+  } else {
+    const returnUrl = encodeURIComponent(req.originalUrl);
+    res.redirect(`/login?returnUrl=${returnUrl}`);
+  }
+};

@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Calendar, Briefcase, PenSquare, LogOut, User, Users } from 'lucide-react'
+import { Calendar, Briefcase, PenSquare, LogOut, User, Users, FileText, ChevronDown } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 interface LayoutProps {
@@ -11,6 +11,13 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const { user, logout } = useAuth()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showReports, setShowReports] = useState(false)
+
+  // 사내 자료 페이지 (백엔드가 로그인 세션 게이팅 후 서빙 — 정적 페이지라 전체 이동)
+  const reportItems = [
+    { href: '/reports/slcdr/', label: 'SLCDR 조달등록 계획', desc: '실적검증·규격·등록가·세금계산서' },
+    { href: '/reports/pricing/', label: 'SLCDR 가격표', desc: '등급·정가·파트너가' },
+  ]
 
   const handleLogout = async () => {
     try {
@@ -68,6 +75,43 @@ export default function Layout({ children }: LayoutProps) {
         </div>
 
         <div className="flex items-center gap-4">
+          {/* 자료실 (사내 조달·가격 자료 — 로그인 후 열람) */}
+          <div className="relative">
+            <button
+              onClick={() => setShowReports(!showReports)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+              title="사내 조달·가격 자료"
+            >
+              <FileText size={18} />
+              <span className="text-sm font-medium hidden sm:block">자료실</span>
+              <ChevronDown size={14} className={`transition-transform ${showReports ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showReports && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowReports(false)} />
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
+                  <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
+                    <p className="text-xs font-semibold text-gray-500">조달·가격 자료 (사내 전용)</p>
+                  </div>
+                  {reportItems.map(item => (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setShowReports(false)}
+                      className="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
+                    >
+                      <div className="text-sm font-medium text-gray-900">{item.label}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{item.desc}</div>
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
           <div className="text-xs lg:text-sm text-gray-500 hidden sm:block">
             HubSpot 계정: 243367573
           </div>

@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>SLCDR 디지털서비스몰 직접등록 실행계획</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{
+    --navy:#0b2e63; --navy2:#15407f; --blue:#2563eb; --sky:#e8f0fe;
+    --ink:#12141c; --muted:#5b6472; --line:#e6e9ef; --bg:#f5f7fb; --card:#fff;
+    --green:#0a7d4d; --green-bg:#e3f6ec; --amber:#9a6700; --amber-bg:#fff3d6;
+    --star:#b4530a; --star-bg:#ffeede; --red:#b42318; --red-bg:#fdecea;
+    --radius:14px; --shadow:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:Pretendard,system-ui,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--blue);text-decoration:none}
+  /* layout */
+  .wrap{display:grid;grid-template-columns:268px 1fr;min-height:100vh}
+  .side{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--navy);color:#cdd7ea;padding:22px 14px;display:flex;flex-direction:column;gap:4px}
+  .brand{color:#fff;font-weight:800;font-size:15px;letter-spacing:-.2px;padding:6px 10px 2px}
+  .brand small{display:block;color:#90a6cd;font-weight:500;font-size:11.5px;margin-top:3px}
+  .progwrap{margin:10px 10px 14px;background:rgba(255,255,255,.08);border-radius:10px;padding:10px 12px}
+  .progwrap .lbl{font-size:11px;color:#9fb3d6;display:flex;justify-content:space-between;margin-bottom:6px}
+  .bar{height:7px;background:rgba(255,255,255,.14);border-radius:6px;overflow:hidden}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4f9bff,#7ce0c0);border-radius:6px;transition:width .35s}
+  .nav{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+  .nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;color:#c4d2ea;font-size:13.5px;font-weight:500;transition:.15s}
+  .nav button .n{flex:none;width:21px;height:21px;border-radius:6px;background:rgba(255,255,255,.1);color:#dbe6fb;font-size:11.5px;font-weight:700;display:grid;place-items:center}
+  .nav button:hover{background:rgba(255,255,255,.07);color:#fff}
+  .nav button.active{background:#fff;color:var(--navy);font-weight:700}
+  .nav button.active .n{background:var(--navy);color:#fff}
+  .nav .sep{height:1px;background:rgba(255,255,255,.1);margin:8px 8px}
+  .nav .navlbl{font-size:10.5px;font-weight:800;color:#7e97c4;letter-spacing:.5px;padding:11px 11px 3px}
+  .main{padding:0;min-width:0}
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(245,247,251,.86);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 30px;display:flex;align-items:center;gap:12px}
+  .topbar h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.3px}
+  .topbar .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 9px}
+  .content{padding:26px 30px 80px;max-width:1000px}
+  .panel{display:none;animation:fade .25s ease}
+  .panel.show{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  h2.ph{font-size:22px;margin:0 0 4px;letter-spacing:-.5px}
+  .ph-sub{color:var(--muted);font-size:13.5px;margin-bottom:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
+  .card h3{margin:0 0 12px;font-size:15px;letter-spacing:-.2px;display:flex;align-items:center;gap:8px}
+  .card h3 .ic{width:22px;height:22px;border-radius:7px;background:var(--sky);color:var(--navy);display:grid;place-items:center;font-size:13px;flex:none}
+  .lead{background:linear-gradient(135deg,#0b2e63,#1c4d96);color:#eaf1ff;border:none}
+  .lead h3{color:#fff}
+  .lead p{margin:6px 0;color:#d6e2f7;font-size:13.5px}
+  .lead b{color:#fff}
+  /* badges */
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2.5px 8px;border-radius:999px;vertical-align:middle}
+  .b-ok{background:var(--green-bg);color:var(--green)}
+  .b-warn{background:var(--amber-bg);color:var(--amber)}
+  .b-star{background:var(--star-bg);color:var(--star)}
+  .b-red{background:var(--red-bg);color:var(--red)}
+  .b-muted{background:#eef1f6;color:#5b6472}
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f7f9fc;color:var(--muted);font-weight:600;font-size:12px}
+  td b{color:var(--ink)}
+  tr:last-child td{border-bottom:none}
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+  /* steps */
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:6px 0}
+  ol.steps li{position:relative;padding:6px 0 6px 34px;font-size:13.5px;border-bottom:1px dashed var(--line)}
+  ol.steps li:last-child{border-bottom:none}
+  ol.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:6px;width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11.5px;font-weight:700;display:grid;place-items:center}
+  /* checklist */
+  .chk{list-style:none;padding:0;margin:4px 0}
+  .chk li{display:flex;gap:10px;align-items:flex-start;padding:7px 8px;border-radius:8px;font-size:13.5px}
+  .chk li:hover{background:#f7f9fc}
+  .chk input{margin-top:3px;width:17px;height:17px;accent-color:var(--blue);flex:none;cursor:pointer}
+  .chk label{cursor:pointer}
+  .chk li.done label{color:var(--muted);text-decoration:line-through}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .note{font-size:12.5px;color:var(--muted);background:#f7f9fc;border-left:3px solid var(--blue);padding:9px 12px;border-radius:0 8px 8px 0;margin:8px 0}
+  .note.warn{border-color:var(--amber);background:var(--amber-bg);color:#6b4e00}
+  .note.tip{border-color:var(--green);background:var(--green-bg);color:#0a5c3a}
+  .flow{font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.7;white-space:pre;background:#0d1b33;color:#d7e3fb;padding:16px 18px;border-radius:12px;overflow-x:auto}
+  .pill-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+  .kv{font-size:13px}
+  .kv b{display:inline-block;min-width:78px;color:var(--muted);font-weight:600}
+  .callbox{display:flex;flex-wrap:wrap;gap:10px}
+  .callbox .c{flex:1 1 200px;background:#f7f9fc;border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .callbox .c b{display:block;font-size:13px}
+  .callbox .c span{font-size:12.5px;color:var(--muted)}
+  .callbox .c .num{font-size:14.5px;color:var(--navy);font-weight:700;margin-top:2px}
+  hr.soft{border:none;border-top:1px dashed var(--line);margin:16px 0}
+  /* mobile */
+  .mtoggle{display:none}
+  .scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:55}
+  .scrim.open{display:block}
+  @media(max-width:860px){
+    .wrap{grid-template-columns:1fr}
+    .side{position:fixed;left:0;top:0;z-index:60;width:80%;max-width:300px;transform:translateX(-100%);transition:.25s;box-shadow:0 0 40px rgba(0,0,0,.3)}
+    .side.open{transform:none}
+    .mtoggle{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:9px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:18px}
+    .content{padding:18px 16px 80px}
+    .grid2{grid-template-columns:1fr}
+    .scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:55}
+    .scrim.open{display:block}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- SIDEBAR -->
+  <aside class="side" id="side">
+    <div class="brand">시큐레터 조달·혁신 등록<small>업무별 프로세스 · 전략기획실 · 2026.07</small></div>
+    <div class="progwrap">
+      <div class="lbl"><span>체크리스트 진행</span><span id="pct">0%</span></div>
+      <div class="bar"><i id="barfill"></i></div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-t="overview" class="active"><span class="n">◎</span> 전체 업무</button>
+      <div class="navlbl">A · SLCDR 디지털서비스몰 등록</div>
+      <button data-t="p0"><span class="n">0</span> 선행 서류</button>
+      <button data-t="p1"><span class="n">1</span> SW사업자 신고</button>
+      <button data-t="p2"><span class="n">2</span> 직접생산확인</button>
+      <button data-t="p3"><span class="n">3</span> 나라장터 등록</button>
+      <button data-t="p4"><span class="n">4</span> 물품목록화</button>
+      <button data-t="p5"><span class="n">5</span> 디지털서비스몰</button>
+      <div class="navlbl">B · SLM 나라장터 등록</div>
+      <button data-t="slm"><span class="n">B</span> SLM 등록 프로세스</button>
+      <div class="navlbl">C · 혁신장터 등록</div>
+      <button data-t="innov"><span class="n">C</span> 혁신장터 프로세스</button>
+      <div class="navlbl">D · MARS</div>
+      <button data-t="marsv2"><span class="n">D</span> MARS V2 수정·대기</button>
+      <div class="sep"></div>
+      <button data-t="docs"><span class="n">▤</span> 서류 마스터</button>
+      <button data-t="contact"><span class="n">☎</span> 문의처</button>
+      <button data-t="todo"><span class="n">✓</span> 즉시 착수</button>
+    </nav>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <button class="mtoggle" id="mtoggle">☰</button>
+      <h1>시큐레터 조달·혁신 등록 업무</h1>
+      <span class="tag">SLCDR · SLM · 혁신장터 · MARS</span>
+    </div>
+    <div class="content">
+
+    <!-- ================= OVERVIEW ================= -->
+    <section class="panel show" id="overview">
+      <h2 class="ph">◎ 전체 업무</h2>
+      <p class="ph-sub">시큐레터 조달/혁신 등록 — 업무별 프로세스 (대표님 회의 반영)</p>
+
+      <div class="card">
+        <h3><span class="ic">▤</span>업무 목록 (좌측에서 업무별 프로세스 확인)</h3>
+        <div class="tbl-wrap"><table>
+          <tr><th>업무</th><th>내용</th><th>채널</th><th>상태</th></tr>
+          <tr><td><b>A</b></td><td>SLCDR 디지털서비스몰 등록 (직접)</td><td>디지털서비스몰</td><td><span class="badge b-ok">진행·상세완비</span></td></tr>
+          <tr><td><b>B</b></td><td>SLM(SECULETTER MANAGER) 등록</td><td>디지털서비스몰</td><td><span class="badge b-warn">GS인증 선행</span></td></tr>
+          <tr><td><b>C</b></td><td>혁신장터 등록 (엔트리급·CDR·SLM)</td><td>혁신장터</td><td><span class="badge b-ok">특허 보유·MARS/CDR</span></td></tr>
+          <tr><td><b>D</b></td><td>MARS V2 사용자수 수정 / APT 대기</td><td>어빌리티 계약</td><td><span class="badge b-muted">협조·대기</span></td></tr>
+        </table></div>
+        <div class="note">아래 내용은 <b>업무 A(SLCDR)</b> 전략 요지 — 좌측 A·B·C·D를 눌러 각 업무 프로세스로 이동</div>
+      </div>
+
+      <div class="card lead">
+        <h3>업무 A 전략 요지</h3>
+        <p>① 가장 빠른 길 = <b>GS인증 기반 상용SW 제3자단가계약(B′)</b>으로 경쟁사처럼 즉시 진입</p>
+        <p>② 병행하여 특허 보강 후 <b>우수조달물품 지정(B)</b> → <b>수의계약</b> 무기 확보</p>
+        <p>③ <b>MAS(A)</b>는 2단계경쟁 약점으로 우선순위 최저</p>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">⛳</span>핵심 결론</h3>
+        <div class="tbl-wrap"><table>
+          <tr><td style="width:140px"><b>방향</b></td><td>시큐레터 직접 계약상대자 (유통마진 0·통제권 확보·어빌리티 종속 종료)</td></tr>
+          <tr><td><b>인증 부담</b></td><td><span class="badge b-ok">GS 보유</span> SLCDR V1 1등급(25-0158) · <span class="badge b-ok">CC 불필요</span> CDR은 업계 전체가 CC 없이 등록</td></tr>
+          <tr><td><b>적격성</b></td><td><span class="badge b-ok">충족</span> 보안SW 납품실적 3년 3건 이상 보유</td></tr>
+          <tr><td><b>임계경로</b></td><td>③ 나라장터 업체등록 승인(수일~2주) + ⑤ 계약형태별 심사</td></tr>
+          <tr><td><b>세부품명</b></td><td>보안소프트웨어 (코드 4323320501)</td></tr>
+        </table></div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">🔀</span>전체 흐름도 &amp; 의존관계</h3>
+        <div class="flow">[선행 0] 중소기업확인서  +  SW 저작권등록(프로그램 등록)   ← 병행 착수
+        │                         │
+        ▼                         │
+[1] 소프트웨어사업자 신고 (KOSA/SWIT)   │   ※ [2]의 필수 선행
+        │                         │
+        ▼                         │
+[2] 직접생산확인증명서(SW) — 보안SW 비대상 │  ✅ 대체로 불필요(조건부)
+        │                         │
+        ▼                         │
+[3] 나라장터 경쟁입찰참가자격 등록 ★임계경로
+        │                         │
+        ▼                         │
+[4] SLCDR 물품목록화(식별번호)          │
+        │                         ▼
+        ▼   ┌─ B′ GS기반 상용SW 3자단가  ⭐즉시 진입(경쟁사 경로)
+[5] 디지털 ─┼─ B  우수조달물품 지정→3자단가 ⭐수의계약(최종목표·70점심사)
+   서비스몰  └─ A  상용SW MAS  (2단계경쟁 약점 → 최저)</div>
+        <div class="note"><b>의존관계</b> · <b>[1]→[3]</b> SW사업자 신고확인서가 제조물품 <b>제조증명(직접생산확인 대체)</b> · [2] 직접생산확인은 보안SW 비대상→대체로 불필요 · [3]→[4] 제조물품 등재가 목록화 선행 · 저작권등록→[5] 3개 트랙 공통 필수</div>
+      </div>
+    </section>
+
+    <!-- ================= P0 ================= -->
+    <section class="panel" id="p0">
+      <h2 class="ph">[선행 0] 사전 확보 서류</h2>
+      <p class="ph-sub">[1][2]와 동시에 병행 착수 — 특히 저작권등록은 숨은 병목</p>
+
+      <div class="card">
+        <h3><span class="ic">①</span>중소기업확인서 <span class="badge b-ok">발급 가능 확인</span></h3>
+        <div class="kv"><p><b>발급</b> 중소기업현황정보시스템(sminfo.mss.go.kr) / 중소벤처24 경유 (본인 로그인·무료·온라인 즉시)</p>
+        <p><b>용도</b> SW사업자 신고·직접생산확인의 선행 (공공구매 발급 시 SMPP 자동 연동)</p>
+        <p><b>문의</b> 1811-6508 · 유효기간 있음 → 만료 전 발급분 사용</p></div>
+        <div class="note tip"><b>✅ 자격 확인 (2026.06.30)</b> SWIT 등재상 시큐레터는 <b>중소기업</b>(상호출자제한 비해당). 정보통신업 기준(3년 평균매출 800억↓·자산 5,000억 미만·독립성) 충족 → <b>발급 가능</b>. 발급 시 표준재무제표가 근거자료</div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">②</span>SW 저작권등록(프로그램 등록) <span class="badge b-ok">보유 확인됨</span></h3>
+        <div class="kv"><p><b>발급</b> 한국저작권위원회 (저작권등록시스템) · 1800-5455</p>
+        <p><b>산출물</b> 저작권등록증 + <b>프로그램등록부</b> → [5] 3개 트랙 <b>전부 필수 제출</b></p></div>
+        <div class="note tip"><b>✅ 확인 완료 (2026.06.30 · CROS 조회)</b> SLCDR V1 저작권등록 <b>C-2025-015380</b> (2025-04-23, 시큐레터㈜ 컴퓨터프로그램저작물). MARS V3(C-2025-018738) 등 총 5건 등록 → <b>선행 병목 해소</b></div>
+      </div>
+    </section>
+
+    <!-- ================= P1 ================= -->
+    <section class="panel" id="p1">
+      <h2 class="ph">[1] 소프트웨어사업자 신고 <span class="badge b-ok">완료 확인됨</span></h2>
+      <p class="ph-sub">직접생산확인의 법적 필수 선행 · 산출물 = 일반현황 관리확인서</p>
+
+      <div class="card" style="border-color:#9ed9b8;background:#f0fbf5">
+        <h3><span class="ic" style="background:var(--green-bg);color:var(--green)">✓</span>✅ 신고 완료 확인 (2026.06.30 · SWIT 조회)</h3>
+        <p class="kv"><b>시큐레터 주식회사(SecuLetter co., Ltd)</b> · 대표 정동진 · <b>영업 상태로 SWIT 등재</b> · 기업규모 <b>중소기업</b></p>
+        <div class="note tip">→ [1] 단계 사실상 완료. 단, 입찰 목적상 <b>매년 재무현황 갱신(변경신고)</b>이 필요하니 최신화 여부만 점검 권장</div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">ℹ</span>개요</h3>
+        <div class="kv">
+          <p><b>정식명</b> "소프트웨어 사업자 일반현황 관리 신청"</p>
+          <p><b>근거</b> 소프트웨어 진흥법 제58조</p>
+          <p><b>관리기관</b> 한국AI·소프트웨어산업협회(KOSA)</p>
+          <p><b>신고분야</b> 패키지소프트웨어 개발·공급사업 (시큐레터 해당)</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3><span class="ic">⚲</span>신청처·방법</h3>
+          <p class="kv"><b>시스템</b> SWIT (swit.or.kr) — 가입 시 <b>"SW사업자"</b> 선택 필수</p>
+          <ol class="steps">
+            <li>SWIT 회원가입(휴대폰 인증)</li>
+            <li>신청서 작성(신규)</li>
+            <li>제출 → 수수료 납부</li>
+            <li>서류검토 → 확인서 발급(온라인 출력 시 공동인증서)</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3><span class="ic">₩</span>수수료·기간</h3>
+          <div class="tbl-wrap"><table>
+            <tr><th>구분</th><th>금액</th></tr>
+            <tr><td>신규</td><td><b>50,000원</b></td></tr>
+            <tr><td>변경</td><td>30,000원</td></tr>
+            <tr><td>재발급</td><td>무료</td></tr>
+          </table></div>
+          <p class="kv" style="margin-top:8px"><b>처리</b> 접수일로부터 <b>7영업일 이내</b></p>
+          <p class="kv"><b>유효</b> 법정 만료일 없으나 <b>입찰 목적상 매년 재무현황 갱신</b> 사실상 필수</p>
+        </div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">▤</span>제출서류</h3>
+        <div class="tbl-wrap"><table>
+          <tr><th>서류</th><th>발급처/비고</th></tr>
+          <tr><td>소프트웨어사업자 신고서(별지16호)</td><td>SWIT 온라인 작성</td></tr>
+          <tr><td>사업자등록증(명원)</td><td>홈택스</td></tr>
+          <tr><td>직전년도 표준 재무제표 확인원</td><td>신설법인 제외 / 개인기업은 부가세 과세표준증명</td></tr>
+          <tr><td>중소기업확인서</td><td>중소기업현황정보시스템(선행0)</td></tr>
+        </table></div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">⚠</span>주의·반려 &amp; 미확인</h3>
+        <p class="kv"><b>반려</b> 재무제표 미확정/불일치, 중소기업확인서 만료, 신고분야 오선택, SWIT 가입유형 오류(일반회원)</p>
+        <div class="note warn"><b>미확인(전화확인)</b> 변경신고 법정기한 · 확인서 유효기간 표기 → <b>KOSA 02-2188-6900</b></div>
+      </div>
+    </section>
+
+    <!-- ================= P2 ================= -->
+    <section class="panel" id="p2">
+      <h2 class="ph">[2] 직접생산확인증명서 (SW) <span class="badge b-ok">대체로 불필요</span></h2>
+      <p class="ph-sub">조회 결과 보안SW는 직접생산확인 비대상 → 조건부/선택 단계</p>
+
+      <div class="card" style="border-color:#9ed9b8;background:#f0fbf5">
+        <h3><span class="ic" style="background:var(--green-bg);color:var(--green)">✓</span>✅ 확인 완료 (2026.06.30 · SMPP 직접생산 확인기준 조회)</h3>
+        <p class="kv"><b>"보안소프트웨어"(4323320501)는 직접생산확인 대상이 아닙니다.</b> SMPP 직접생산확인기준(973개) 검색 결과:</p>
+        <p class="kv">· "소프트웨어" 검색 → <b>서비스 2종만</b>: 패키지소프트웨어개발및도입서비스(8111159801), 소프트웨어유지및지원서비스(8111229901)</p>
+        <p class="kv">· "보안" 검색 → 보안카메라·보안등기구 등 <b>하드웨어 5종만</b>, 보안SW 없음</p>
+        <div class="note tip"><b>의미</b> 직접생산확인 의무는 "중기간 경쟁제품"에 연동되는데 보안SW는 비대상 → <b>SLCDR 등록에 직접생산확인증명서는 사실상 불필요.</b> 특히 권장 경로 <b>B′(GS기반 상용SW 3자단가)</b>는 직접생산확인이 아니라 <b>GS인증+시중거래실적</b> 기반</div>
+        <div class="note warn"><b>예외(선택)</b> 중기간 경쟁제품 입찰/제조물품 자격을 원하면, 시큐레터는 패키지SW 개발사이므로 <b>"패키지소프트웨어개발및도입서비스"(8111159801)</b>로 직접생산확인 취득 가능. 나라장터 제조물품 등록 시 제조증명 요건은 조달청 1588-0800 확인 권장</div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">ℹ</span>개요 &amp; 선행 등록</h3>
+        <p class="kv"><b>운영</b> 한국중소벤처기업유통원 · <b>시스템</b> SMPP(smpp.go.kr) · <b>근거</b> 판로지원법 9조의2</p>
+        <ol class="steps">
+          <li>중소기업확인서 발급(선행0)</li>
+          <li>SMPP 회원가입(기업회원+본인인증)</li>
+          <li>SMPP 기업정보 등록: 일반정보 → 생산공장정보 → 제품정보</li>
+          <li>직접생산확인 신청(나의 업무 → 직접생산확인)</li>
+        </ol>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3><span class="ic">✓</span>요건 (SW 분야)</h3>
+          <div class="tbl-wrap"><table>
+            <tr><th>항목</th><th>기준</th></tr>
+            <tr><td>선행</td><td>SW사업자 신고 + 중소기업확인서</td></tr>
+            <tr><td>작업장</td><td>자가/임차, <b>본점·지점 주소 일치</b></td></tr>
+            <tr><td>생산시설</td><td>개발용 <b>PC 1대↑(자가, 임차 불인정)</b></td></tr>
+            <tr><td>인력</td><td>SW개발인력 <b>1인↑</b> (아래 3택1)</td></tr>
+          </table></div>
+          <p class="kv" style="margin-top:8px"><b>인력 증명 3택1</b><br>① 국가기술자격 ② 관련학과 졸업 ③ <b>KOSA 경력증명(1년↑)</b> — career.sw.or.kr (최초 25,000원/연 5,000원/증명 2,000원)</p>
+        </div>
+        <div class="card">
+          <h3><span class="ic">₩</span>절차·기간·유효</h3>
+          <p class="kv"><b>절차</b> 신청 → <b>SW는 실태조사 생략(서류심사)</b> → 승인 → 발급</p>
+          <p class="kv"><b>유효</b> 발급일로부터 <b>2년</b> (만료 30일 전 재신청 시 연장)</p>
+          <div class="note warn">처리기간·수수료가 자료마다 상충(SW는 빠름 vs 일반제조 40~50일/20만원). <b>SW 분야 정확치는 SMPP 확인 필요</b></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">▤</span>제출서류</h3>
+        <div class="tbl-wrap"><table>
+          <tr><th>서류</th><th>발급처</th></tr>
+          <tr><td>SW사업자 일반현황 관리확인서</td><td>KOSA([1] 산출물)</td></tr>
+          <tr><td>4대 사회보험 사업장 가입자 명부</td><td>4대보험 포털</td></tr>
+          <tr><td>사업자등록증명서</td><td>홈택스</td></tr>
+          <tr><td>부동산계약서(자가/임대차)</td><td>자체</td></tr>
+          <tr><td>생산시설 보유목록 확인서</td><td>자체 작성</td></tr>
+          <tr><td>생산인력 자격요건 증빙</td><td>자격증/졸업/경력</td></tr>
+          <tr><td>원천징수이행상황 신고서(3개월)</td><td>홈택스</td></tr>
+          <tr><td>이체확인증(임차료, 임차 시)</td><td>은행</td></tr>
+        </table></div>
+        <div class="note warn"><b>미확인</b> SW 분야 처리기간·수수료, 보안소프트웨어 대상 여부 → <b>직접생산확인 1533-0092 / 02-2656-9988</b></div>
+      </div>
+    </section>
+
+    <!-- ================= P3 ================= -->
+    <section class="panel" id="p3">
+      <h2 class="ph">[3] 나라장터 경쟁입찰참가자격 등록 <span class="badge b-red">★임계경로</span></h2>
+      <p class="ph-sub">제조물품(소프트웨어)으로 등록 → 제조사 지위 확보</p>
+
+      <div class="card" style="border-color:#9ed9b8;background:#f0fbf5">
+        <h3><span class="ic" style="background:var(--green-bg);color:var(--green)">✓</span>✅ 제조물품 등록 가능 — 제조증명은 직접생산확인 "아님" (2026.06.30 확인)</h3>
+        <p class="kv">보안SW는 직접생산확인 비대상이지만, SW 제조물품 등록의 <b>제조증명서류는 "소프트웨어사업자 일반현황 관리확인서"(또는 SW사업수행 실적증명서)로 대체</b> 가능 (입찰참가자격등록규정 <b>제23조의2②3호</b>).</p>
+        <div class="note tip">→ 시큐레터는 <b>SW사업자 신고확인서를 이미 보유([1] 완료)</b> → 제조물품 등록에 직접생산확인 불필요. 막힘없이 진행 가능</div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">⚙</span>STEP 0 · 사전 준비물 (등록 신청 전)</h3>
+        <div class="tbl-wrap"><table>
+          <tr><th>준비물</th><th>내용 · 비용</th></tr>
+          <tr><td><b>사업자 범용 공동인증서(법인)</b> <span class="badge b-ok">보유</span></td><td>✅ <b>이미 보유</b> (시큐레터 확인). 유효기간 1년이므로 만료일만 점검</td></tr>
+          <tr><td>지문보안토큰</td><td><span class="badge b-ok">불필요</span> <b>2024.1.1 사용의무 전면 폐지</b> → 조달청 방문·수령 불필요</td></tr>
+          <tr><td>SW사업자 일반현황 관리확인서</td><td><b>제조증명서류</b>로 사용 ([1] 보유) · 최신 결산 기준 갱신본 권장</td></tr>
+          <tr><td>기본서류</td><td>사업자등록증·법인등기부등본·인감증명서+사용인감계·국세/지방세 완납증명</td></tr>
+        </table></div>
+        <div class="note"><b>제조물품으로 등록하는 이유</b> 공급물품 대비 제조사 지위·중소기업·우선구매 혜택 + 디지털서비스몰 "제조사" 표기. 제조증명은 SW사업자 확인서로 충족.</div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">①</span>STEP 1 · 회원가입 &amp; 인증서 등록</h3>
+        <p class="kv">나라장터(g2b.go.kr) 접속 → [알림ON] → 이용자등록 → 업체 → <b>조달업체 신규등록</b> → 공동인증서 등록</p>
+        <div class="note"><b>필요</b> 사업자 범용 공동인증서(STEP 0)</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">②</span>STEP 2 · 약관 동의 → 기본·대표자 정보</h3>
+        <p class="kv"><b>약관</b> 이용약관 / 고유식별정보 수집 / 개인정보 수집 동의(필수)</p>
+        <p class="kv"><b>기본정보(필수)</b> 사업자등록번호(중복조회)·개업일자·상호·지역코드·종업원수·주소·전화·법인설립일자·법인등록번호(중복조회)</p>
+        <p class="kv"><b>대표자정보(필수)</b> 대표자 성명·주민등록번호·이메일·휴대폰 → <b>실명인증</b></p>
+      </div>
+      <div class="card" style="border-color:#bcd2f5">
+        <h3><span class="ic">③</span>STEP 3 · 제조물품(직접생산용역) 탭 ★핵심</h3>
+        <p class="kv"><b>세부품명</b> [행추가]→세부품명찾기에서 <b>"보안소프트웨어"(4323320501)</b> 검색·선택</p>
+        <p class="kv"><b>제조증명서류</b> = <b>SW사업자 일반현황 관리확인서</b> (직접생산확인 대체, 규정 제23조의2②3호) 첨부</p>
+        <p class="kv"><b>그 외 입력</b> 유효기간 · 발급자명(한국SW산업협회) · 증서명 · 공장의 업종(분류코드) · 대표물품여부</p>
+        <div class="note warn"><b>공장정보 입력</b> SW는 물리적 공장이 없음 → 제조물품 탭의 공장정보란을 본점 사업장으로 갈음하는지 등 입력 방식은 <b>조달청 1588-0800</b> 확인(사소)</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">④</span>STEP 4 · 접수관련정보 → 송신 → 서류제출</h3>
+        <p class="kv"><b>등록기관</b> 사업장(또는 공장) 소재지 <b>관할 지방조달청</b> 선택</p>
+        <p class="kv"><b>필수</b> 행정정보 공동이용 사전동의서 + 청렴계약 서약서(시스템 작성)</p>
+        <p class="kv"><b>송신</b> 공동인증서 서명 → 송신 → 증빙서류 첨부 제출(상태 <b>"승인요청"</b>) → 안내문 인쇄로 제출서류 확인</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">⑤</span>STEP 5 · 심사 → 등록증 발급</h3>
+        <p class="kv">관할 지청 검토·승인 → <b>경쟁입찰참가자격등록증</b> 발급(나라장터 출력) · 소요 <b>수일~2주</b></p>
+        <div class="note tip"><b>지문보안토큰</b> 2024.1.1 의무 폐지 → <b>조달청 방문 불필요</b>. 등록증 발급으로 입찰참가자격 확보 완료</div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3><span class="ic">₩</span>수수료 요약</h3>
+          <div class="tbl-wrap"><table>
+            <tr><th>항목</th><th>비용</th></tr>
+            <tr><td>입찰참가자격 등록(조달청)</td><td><b>무료</b></td></tr>
+            <tr><td>사업자 범용 공동인증서</td><td>약 110,000원/년</td></tr>
+            <tr><td>지문보안토큰</td><td>불필요(폐지)</td></tr>
+          </table></div>
+        </div>
+        <div class="card">
+          <h3><span class="ic">⚠</span>주의·반려 사유</h3>
+          <ul class="chk" style="pointer-events:none">
+            <li>· SW사업자 확인서 미최신화(재무현황 미갱신) → 보완</li>
+            <li>· 세부품명 매핑 오류 / 관할 지청 오선택</li>
+            <li>· 제조증명서류 누락 또는 버전 불일치</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">✓</span>이 단계 체크리스트</h3>
+        <ul class="chk" data-store>
+          <li><input type="checkbox" id="p3a" checked><label for="p3a">사업자 범용 공동인증서(법인) ✅ 보유</label></li>
+          <li><input type="checkbox" id="p3b"><label for="p3b">SW사업자 일반현황 관리확인서 최신본 준비(제조증명)</label></li>
+          <li><input type="checkbox" id="p3c"><label for="p3c">기본서류 4종(사업자등록증·등기부·인감·완납증명)</label></li>
+          <li><input type="checkbox" id="p3d"><label for="p3d">나라장터 신규등록 → 제조물품(보안소프트웨어) 입력</label></li>
+          <li><input type="checkbox" id="p3e"><label for="p3e">관할 지청 선택 + 동의서·서약서 → 송신·제출</label></li>
+          <li><input type="checkbox" id="p3f"><label for="p3f">승인 → 경쟁입찰참가자격등록증 발급</label></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ================= P4 ================= -->
+    <section class="panel" id="p4">
+      <h2 class="ph">[4] SLCDR 물품목록화</h2>
+      <p class="ph-sub">규격(판매단위)별 물품식별번호 부여 — 디지털서비스몰 등록의 전제</p>
+
+      <div class="card">
+        <h3><span class="ic">ℹ</span>개요</h3>
+        <p class="kv"><b>시스템</b> 목록정보시스템 <b>goods.g2b.go.kr</b> → 목록화 요청(품명등록)</p>
+        <p class="kv"><b>물품식별번호</b> = 제품을 <b>규격(판매단위)별</b>로 부여하는 고유번호 (예: 어빌리티 MARS V2 "Entry/1~999User")</p>
+        <p class="kv"><b>대상 세부품명</b> 보안소프트웨어 4323320501 / 물품분류 43233205 (기존 분류 존재 → 신규 식별번호만 부여)</p>
+      </div>
+      <div class="card" style="border-color:#f0c36b;background:#fffaf0">
+        <h3><span class="ic" style="background:var(--amber-bg);color:var(--amber)">!</span>STEP 0 · 선행조건 (필수)</h3>
+        <p class="kv">제조업체(시큐레터)가 <b>경쟁입찰참가자격등록증에 "보안소프트웨어" 세부품명을 등재</b>([3] 완료)해야 목록화가 연결됨. → <b>[3]이 먼저.</b></p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">①</span>STEP 1 · 목록정보시스템 접속 &amp; 요청</h3>
+        <p class="kv">goods.g2b.go.kr 접속(공동인증서) → 목록화 요청 → 세부품명 <b>보안소프트웨어(4323320501)</b> 선택 → <b>규격(판매단위) 정의</b> (Edition/사용자수/기간 등)</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">②</span>STEP 2 · 제출자료 등록</h3>
+        <ul class="chk" data-store>
+          <li><input type="checkbox" id="d4a"><label for="d4a">물품목록화 요청서</label></li>
+          <li><input type="checkbox" id="d4b"><label for="d4b">규격서·사양서·카탈로그</label></li>
+          <li><input type="checkbox" id="d4d"><label for="d4d">제품 이미지(실행화면 또는 박스 사진) — SW 필수</label></li>
+          <li><input type="checkbox" id="d4c"><label for="d4c">GS인증서 (SLCDR V1, 25-0158)</label></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="ic">③</span>STEP 3 · 식별번호 부여</h3>
+        <p class="kv">조달청 검토 → <b>규격별 물품식별번호 발급</b> · 소요 <b>요청일로부터 8일</b>(공휴일·토요일 제외)</p>
+      </div>
+      <div class="card" style="border-color:#f5b9b3;background:#fdf3f2">
+        <h3><span class="ic" style="background:var(--red-bg);color:var(--red)">!</span>⚠️ 버전 일치 — 가장 흔한 반려</h3>
+        <p class="kv"><b>SW명(GS인증) · 프로그램명(저작권등록) · 세부품명(나라장터 목록화)</b> 이 <b>버전까지 100% 일치</b>해야 함</p>
+        <div class="note tip">시큐레터: GS=<b>SLCDR V1</b> · 저작권=<b>SLCDR V1</b>(C-2025-015380) → 일치 OK. 목록화도 "SLCDR V1"로 통일</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">⏱</span>기간·수수료·문의</h3>
+        <p class="kv"><b>소요</b> 8일(공휴일·토요일 제외) · <b>수수료</b> 통상 무료/소액(미확인)</p>
+        <p class="kv"><b>문의</b> 조달청 1588-0800 / 디지털서비스 이용지원센터 <b>1522-0089(내선1)</b> (물품식별번호 발급 안내)</p>
+      </div>
+    </section>
+
+    <!-- ================= P5 ================= -->
+    <section class="panel" id="p5">
+      <h2 class="ph">[5] 디지털서비스몰 등록 — 3개 트랙</h2>
+      <p class="ph-sub">3개 트랙 모두 저작권등록증+프로그램등록부 필요 · B와 B′는 상호배타</p>
+
+      <div class="card lead">
+        <h3>권장 로드맵</h3>
+        <p>1. 저작권등록·GS 1등급 확인</p>
+        <p>2. <b>B′(GS기반 상용SW 3자단가)로 즉시 진입</b> — 경쟁사와 동일 무대 빠르게 확보</p>
+        <p>3. 병행 CDR 엔진 <b>특허 보강</b> 후 <b>B(우수조달물품 지정)</b> 신청 (70점 심사)</p>
+        <p>4. 지정 시 <b>수의계약 기반으로 전환</b> · <b>A(MAS)는 우선순위 최저</b></p>
+      </div>
+
+      <div class="card" style="border-color:#bcd2f5">
+        <h3><span class="ic">B′</span>GS기반 상용SW 제3자단가계약 <span class="badge b-star">⭐가장 빠른 진입(권장)</span></h3>
+        <p class="kv">우수조달 지정 없이 <b>GS인증만으로</b> 디지털서비스몰 등록(2021 개정). <b>경쟁사 새니톡스·SHIELDEX가 쓴 경로로 유력</b></p>
+        <p class="kv"><b>요건</b> GS인증 · 최근 2년 내 <b>3건↑ 시중거래실적</b> · 중소기업 · 신용 <b>B-↑</b> · 저작권등록</p>
+        <p class="kv"><b>장점</b> 진입 빠름 · <b>단점</b> 수의계약 우위 없음(B 전환 전까지)</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">↧</span>B′ 절차 (단계별)</h3>
+        <ol class="steps">
+          <li>[3] 입찰참가자격(제조물품) + [4] 물품식별번호 확보</li>
+          <li>상용SW 제3자단가계약 신청 + 서류 제출</li>
+          <li><b>가격자료 제출 → 가격협상(수의시담)</b></li>
+          <li>제3자단가계약 체결</li>
+          <li><b>디지털서비스몰 상품 등록</b> → 게시(수요기관 구매 가능)</li>
+        </ol>
+        <p class="kv"><b>처리기간</b> 서류 완비 시 통상 1~3개월(가격협상 일정 따라)</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">▤</span>B′ 제출서류</h3>
+        <ul class="chk" data-store>
+          <li><input type="checkbox" id="b5a" checked><label for="b5a">GS인증서 사본 (SLCDR V1, 25-0158) ✅</label></li>
+          <li><input type="checkbox" id="b5b" checked><label for="b5b">프로그램 등록증 + 프로그램 등록부 (C-2025-015380) ✅</label></li>
+          <li><input type="checkbox" id="b5c"><label for="b5c">GS인증 소프트웨어 선정확인서 사본 — 보유 확인 필요</label></li>
+          <li><input type="checkbox" id="b5d" checked><label for="b5d">최근 2년 내 시중거래실적 3건↑ ✅</label></li>
+          <li><input type="checkbox" id="b5e"><label for="b5e">가격자료(견적서·거래실적·원가) · 제품설명서</label></li>
+        </ul>
+        <div class="note warn"><b>3종 버전 일치 필수</b> GS인증서·프로그램등록·세부품명이 모두 동일 버전(SLCDR V1)이어야 함</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">₩</span>B′ 가격 책정 (실무 참고)</h3>
+        <p class="kv"><b>원칙</b> 시중 <b>최저거래가격 기준</b>으로 협상(우대가격 유지의무). 시중 공급가보다 높게 못 올림</p>
+        <p class="kv"><b>실무 관례(SW사 사례)</b> 등록가 ≈ 기준가의 <b>94.5%</b> · 협상 상한 ~96% · 갱신 시 직전가의 ~98% 이하</p>
+        <div class="note">→ SLCDR 라이선스 체계(Edition/사용자수)별 시중가를 먼저 정리해야 가격자료·규격(판매단위)이 일관됨</div>
+      </div>
+      <div class="card" style="border-color:#bcd2f5">
+        <h3><span class="ic">📑</span>가격자료 상세 — 정확히 무엇을 내나</h3>
+        <p class="kv">상용SW 3자단가는 입찰이 아니라 <b>가격협상(수의시담)</b>으로 단가 결정 → 그 근거 서류가 "가격자료"</p>
+        <div class="tbl-wrap"><table>
+          <tr><th>서류</th><th>양식·내용</th></tr>
+          <tr><td>가격자료 제출서</td><td>별지 제4호 서식</td></tr>
+          <tr><td>견적서</td><td>별지 제5호 서식 (희망 등록가)</td></tr>
+          <tr><td><b>규격별 거래내역(단가산정용)</b></td><td>별지 제6호 서식 ← 핵심</td></tr>
+          <tr><td>매출장</td><td>최근 1년 이내</td></tr>
+          <tr><td>전자세금계산서 사본</td><td>실거래 증빙</td></tr>
+          <tr><td>납품(판매)실적증명원</td><td>필요시</td></tr>
+          <tr><td>(원가계산서)</td><td>시중 거래실적 부족 시 원가 기반 산정용</td></tr>
+        </table></div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">📐</span>거래실적 요건 &amp; 가격 결정 원리</h3>
+        <p class="kv"><b>거래실적</b> 규격별 <b>최근 1년 내 3건↑</b>(부족 시 최대 2년) 민간/공공 판매자료 · <b>자사 명의만 인정</b>(시큐레터 직접 OK) · 유지관리/커스터마이징은 면제</p>
+        <p class="kv"><b>가격 결정</b> 거래내역에서 <b>최저가/최빈가/가중평균가</b> 산출 → 협상기준가격 결정 → 견적과 협상</p>
+        <div class="note warn"><b>우대가격 유지의무</b> 계약단가는 <b>시중 최저거래가 이하</b>만 가능. 이후 더 싸게 직접 판매 시 계약단가도 인하됨</div>
+      </div>
+      <div class="card" style="border-color:#9ed9b8;background:#f0fbf5">
+        <h3><span class="ic" style="background:var(--green-bg);color:var(--green)">★</span>시큐레터 실무 포인트</h3>
+        <ul class="chk" style="pointer-events:none">
+          <li>· SLCDR <b>규격(Edition/사용자수/기간)별로</b> 최근 1~2년 거래 3건씩 정리(세금계산서·거래명세서·매출장)</li>
+          <li>· <b>세금계산서에 정확한 라이선스/모델/버전(SLCDR V1)</b> 표기돼야 실적 인정 ← 흔한 누락</li>
+          <li>· 규격별 판매가 들쭉날쭉하면 <b>최저가가 기준</b> → 등록가 하락. 시중 판매가 일관성 관리</li>
+          <li>· 실적 없는 신규 규격은 원가계산서 기반 산정 or 실적 확보 후 신청</li>
+        </ul>
+      </div>
+
+      <div class="card" style="border-color:#9ed9b8;background:#f0fbf5">
+        <h3><span class="ic" style="background:var(--green-bg);color:var(--green)">✓</span>✅ 실적·제품명 검증 완료 (2026.07.01 · 견적서·세금계산서 원본 대조)</h3>
+        <p class="kv">판매 20건 전수의 <b>견적서·세금계산서·사용권증서 원본 텍스트</b>를 대조. 판정 기준은 <b>"고객 발행 세금계산서의 품목명"</b>(사내 대장 분류 아님).</p>
+        <p class="kv">결과: <span class="badge b-ok">완전실적 2</span> <span class="badge b-warn">준실적 3(CDR표기)</span> <span class="badge b-red">실적불가 다수(APT·번들)</span> <span style="font-size:11px;color:#4a5a70">· 전체 세금계산서 543건 전수스캔 → "SLCDR" 명세 2건</span></p>
+        <div class="tbl-wrap"><table>
+          <tr><th>파트너 → 최종고객</th><th>세금계산서 실제 품목</th><th>공급가</th><th>판정</th></tr>
+          <tr><td><b>서원정보 → K사</b> 🆕</td><td><b>MARS V2 SLCDR</b> (단독, 2023-12-15)</td><td>81,818,182</td><td><span class="badge b-ok">✅ 완전실적</span></td></tr>
+          <tr><td><b>한국소프테크 → K사</b></td><td><b>MARS V2 SLCDR</b> (단독, 2024-12-20)</td><td>84,090,909</td><td><span class="badge b-ok">✅ 완전실적</span></td></tr>
+          <tr><td>디비아이엔씨 → 보험개발원</td><td>CDR 라이선스 / MARS V2 CDR 서브스크립션</td><td>17.2M·53.2M·20.6M</td><td><span class="badge b-warn">△ 준실적</span></td></tr>
+          <tr><td>윈스 → 프라이빗테크놀로지</td><td>CDR for Cloud (단독)</td><td>15,000,000</td><td><span class="badge b-warn">△ 준실적</span></td></tr>
+          <tr><td>SK쉴더스 → 공정거래위원회</td><td>망간자료전송보안솔루션 <b>APT</b></td><td>38,000,000</td><td><span class="badge b-red">❌ APT발행</span></td></tr>
+          <tr><td>휴네시온/티앤디 → 한국전력</td><td>차세대APT솔루션 <b>MARS V2 Enterprise</b></td><td>79,072,727</td><td><span class="badge b-red">❌ APT발행</span></td></tr>
+          <tr><td>씨엠티·한진 (방화벽 동반)</td><td>FG-120G/포티넷방화벽 <b>및 CDR</b> 합산</td><td>번들 261M~310M</td><td><span class="badge b-red">❌ 번들</span></td></tr>
+        </table></div>
+        <div class="note tip"><b>결론</b> 전체 세금계산서 <b>543건 전수스캔</b> 결과 품목에 "SLCDR"이 정확히 찍힌 완전 실적 = <b>2건(서원정보 2023·한국소프테크 2024, 모두 →K사)</b>. 보험개발원·윈스는 "CDR"로 발행돼 <b>동일성 확인서 첨부 시 준실적</b>. 공공(APT)·방화벽 번들건은 실적 불가. → 별지 제6호 거래내역은 <b>SLCDR명세 2건 + 준실적 2~3건</b>으로 구성.</div>
+        <div class="note warn" style="font-size:11.5px"><b>후속(중요)</b> "SLCDR" 정확표기 세금계산서는 K사 2건뿐이고 그중 서원정보(2023-12)는 실적 2년창 경계 밖. 향후 SLCDR 판매 시 <b>세금계산서 품목을 반드시 "SLCDR V1"로 통일 발행</b>하도록 재무에 요청 → 실적이 정상 축적됨.</div>
+      </div>
+
+      <div class="card" style="border-color:#bcd2f5">
+        <h3><span class="ic">📎</span>세금계산서·증빙 원본 — CDR후보 20건 + 전수스캔 추가발견 1건 (썸네일 클릭 = 원본)</h3>
+        <p style="font-size:12.5px;color:#42506a;line-height:1.65;margin:6px 0"><b style="color:#0a5c3a">#00 서원정보</b>는 전체 543건 전수스캔에서 새로 찾은 <b>"MARS V2 SLCDR" 명세 세금계산서</b>(CSV 20건 밖). 나머지는 CDR후보 20건. 판정 근거는 위 <b>대조표</b>와 동일. <b>세금계산서 확보 16건</b> · 갱신 1건(역발행→계약서) · <b>미확보 4건</b>(글로벌텔레콤·법무부·무명 2).</p>
+        <div class="note warn" style="font-size:11.5px">⚠️ 원본에 거래상대방 사업자번호·승인번호·담당자 정보 포함. 대외 공유 시 유의.</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:11px;margin-top:8px"><div style="border:2px solid #9ed9b8;border-radius:9px;padding:9px;background:#f0fbf5"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#00 서원정보 🆕</b><span class="badge b-ok">✅ 완전실적</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ K사(미래과학아카데미) · 81,818,182 · 2023-12-15</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px"><b style="color:#0a5c3a">MARS V2 SLCDR</b> · 전수스캔 추가발견</div><div style="display:flex;gap:6px"><a href="inv/00_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/00_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a><a href="inv/00_cert.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/00_cert.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">사용권증서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#01 (주)글로벌텔레콤</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">85,000,000 · 2024-06-10</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">SLF1800(CDR) 번들</div><div style="height:118px;display:grid;place-items:center;border:1px dashed #d7e0ee;border-radius:6px;color:#9aa7b8;font-size:11px;background:#fafbfd">세금계산서 미확보</div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#02 SK쉴더스</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ 공정거래위원회 · 38,000,000 · 2024-12-30</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">SLCDR</div><div style="display:flex;gap:6px"><a href="inv/02_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/02_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a><a href="inv/02_cert.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/02_cert.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">사용권증서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#03 디비아이엔씨</b><span class="badge b-warn">△ 준실적</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ 보험개발원(2024) · 20,600,000 · 2024-12-28</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">CDR</div><div style="display:flex;gap:6px"><a href="inv/03_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/03_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a><a href="inv/03_cert.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/03_cert.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">사용권증서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#04 디피오코리아</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ 부산은행 · 90,000,000 · 2025-01-07</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">SLF1800(CDR) 번들</div><div style="display:flex;gap:6px"><a href="inv/04_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/04_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a><a href="inv/04_quote.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/04_quote.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">견적서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#05 휴네시온/티앤디</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ 한국전력공사 · 79,072,727 · 2025-12-30</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">SLCDR→APT표기</div><div style="display:flex;gap:6px"><a href="inv/05_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/05_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#06 제이비에이</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">104,600,000 · 2026-03-16</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">SLE5000+SLF1800(CDR) 번들</div><div style="display:flex;gap:6px"><a href="inv/06_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/06_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#07 (무명)</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">104,600,000 · -</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">SLF1800(CDR) 번들</div><div style="height:118px;display:grid;place-items:center;border:1px dashed #d7e0ee;border-radius:6px;color:#9aa7b8;font-size:11px;background:#fafbfd">세금계산서 미확보</div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#08 엑셀로</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">104,600,000 · 2026-03-24</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">SLF1800(CDR) 번들</div><div style="display:flex;gap:6px"><a href="inv/08_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/08_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#09 법무부</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">50,000,000 · -</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">SLF900(CDR) 번들</div><div style="height:118px;display:grid;place-items:center;border:1px dashed #d7e0ee;border-radius:6px;color:#9aa7b8;font-size:11px;background:#fafbfd">세금계산서 미확보</div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#10 한국소프테크</b><span class="badge b-ok">✅ 완전실적</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ K사(미래과학아카데미) · 84,090,909 · 2024-12-20</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">MARS V2 SLCDR</div><div style="display:flex;gap:6px"><a href="inv/10_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/10_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a><a href="inv/10_quote.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/10_quote.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">견적서 ↗</span></a><a href="inv/10_cert.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/10_cert.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">사용권증서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#11 디비아이엔씨</b><span class="badge b-warn">△ 준실적</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ 보험개발원(신규+DR) · 17,170,000 · 2025-12-03</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">CDR 라이선스</div><div style="display:flex;gap:6px"><a href="inv/11_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/11_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a><a href="inv/11_quote.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/11_quote.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">견적서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#12 디비아이엔씨</b><span class="badge b-warn">△ 준실적</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ 보험개발원(갱신) · 53,227,000 · 역발행(월)</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">CDR 서브스크립션</div><div style="display:flex;gap:6px"><a href="inv/12_contract.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/12_contract.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">계약서(CDR구독) ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#13 윈스테크넷</b><span class="badge b-warn">△ 준실적</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ 프라이빗테크놀로지 · 15,000,000 · 2025-12-19</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">CDR for Cloud</div><div style="display:flex;gap:6px"><a href="inv/13_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/13_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a><a href="inv/13_po.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/13_po.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">발주서(SLCDR) ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#14 씨엠티정보통신</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ 하나자산운용 · 12,190,000 · 2026-03-25</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">MARS V2 CDR(방화벽번들)</div><div style="display:flex;gap:6px"><a href="inv/14_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/14_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#15 씨엠티정보통신</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ 삼성SDS · 22,600,000 · 2026-03-31</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">MARS V2 CDR(방화벽번들)</div><div style="display:flex;gap:6px"><a href="inv/15_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/15_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#16 한진정보통신</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ S은행(1차) · 9,650,000 · 2026-04-30</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">방화벽+CDR 번들</div><div style="display:flex;gap:6px"><a href="inv/16_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/16_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#17 한진정보통신</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ S사(2차) · 9,684,200 · 2026-04-30</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">방화벽+CDR 번들</div><div style="display:flex;gap:6px"><a href="inv/17_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/17_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#18 한진정보통신</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ H산업개발 · 9,686,000 · 2026-05-20</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">시스템고도화(데이터쿡)</div><div style="display:flex;gap:6px"><a href="inv/18_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/18_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a></div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#19 (무명)</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">4,632,000 · -</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">CDR</div><div style="height:118px;display:grid;place-items:center;border:1px dashed #d7e0ee;border-radius:6px;color:#9aa7b8;font-size:11px;background:#fafbfd">세금계산서 미확보</div></div><div style="border:1px solid #e2e8f2;border-radius:9px;padding:9px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px"><b style="font-size:12.5px">#20 한진정보통신</b><span class="badge b-red">❌</span></div><div style="font-size:11px;color:#6b7a90;margin-bottom:6px">→ W투자증권(통합승인) · 9,240,000 · 2026-05-29</div><div style="font-size:10.5px;color:#8a97a8;margin-bottom:6px">통합승인관리솔루션(솔루피아)</div><div style="display:flex;gap:6px"><a href="inv/20_tax.png" target="_blank" rel="noopener" style="display:block;flex:1;min-width:96px;text-decoration:none"><img src="inv/20_tax.png" loading="lazy" style="width:100%;height:118px;object-fit:cover;object-position:top;border:1px solid #d7e0ee;border-radius:6px;background:#fff"><span style="display:block;font-size:10px;color:#4a5a70;text-align:center;margin-top:3px">세금계산서 ↗</span></a></div></div></div>
+      </div>
+
+      <div class="card" style="border-color:#bcd2f5">
+        <h3><span class="ic">₩</span>SLCDR 실거래 단가 &amp; 규격·등록가 (제안)</h3>
+        <p class="kv"><b>판매단위</b> 1 라이선스 / <b>1년(12개월) 구독</b> · SW Only(HW·기술지원·망연계 별도) · 등급 Entry·Middle·High(처리량 기반)</p>
+        <p class="kv"><b>정규 실거래 밴드</b> 약 <b>20.6M ~ 28.0M / 식·년</b>(공급가). 한국소프테크 28,030,303(High·SLF1800) · 씨엠티 삼성SDS 22.6M · 보험개발원 월1,717,000(=20.6M/년). 방화벽 번들 특가(12.19M)는 제외</p>
+        <div class="tbl-wrap"><table>
+          <tr><th>등급</th><th>대응</th><th>소비자가(정가/년, VAT별도)</th><th>근거</th></tr>
+          <tr><td>Entry</td><td>MARS 450</td><td>20,000,000</td><td>보험개발원 월단가·참고가</td></tr>
+          <tr><td>Middle</td><td>MARS 900</td><td>24,000,000</td><td>밴드 중앙</td></tr>
+          <tr><td>High</td><td>MARS 1800</td><td>28,000,000</td><td>한국소프테크 실거래</td></tr>
+        </table></div>
+        <div class="note">등록가 = 소비자가 × (1−할인). 우대가격 유지의무상 <b>최저 실거래가(≈20.6M) 이하</b>로. 확정 전 <b>사내 표준단가 품의서</b> 확보 필요(증빙 폴더엔 없음)</div>
+      </div>
+
+      <div class="card" style="border-color:#f0c98a;background:#fffaf0">
+        <h3><span class="ic" style="background:var(--amber-bg);color:var(--amber)">!</span>등록 제품명 결정 — "MARS V2"는 어빌리티 등록이라 프리픽스 제외</h3>
+        <p class="kv"><b>권고: 등록명 = <span class="badge b-star">SLCDR V1</span></b> (MARS V2 붙이지 않음)</p>
+        <p class="kv">"MARS V2"는 <b>어빌리티가 이미 나라장터 등록</b>(규격 "Entry/1~999User"). 직접등록 목적이 <b>어빌리티 종속 종료</b>이므로 브랜드 분리. 저작권 C-2025-015380·GS 25-0158도 "SLCDR V1"이라 <b>인증 정합성 최상</b>.</p>
+        <p class="kv"><b>충돌 아님</b> SLCDR은 별도 저작권·GS·세부품명(보안SW 4323320501)의 독립제품 → 어빌리티 MARS V2(APT/CC)와 인증·기능 별개. 세금계산서 "MARS V2 SLCDR/CDR" 갭은 <b>동일제품 확인서 1장</b>으로 봉합(포함관계라 소명 용이)</p>
+        <div class="note warn"><b>확인 1건</b> 어빌리티 공급계약서 제품범위 → MARS V2(APT) 국한·CDR 미포함 확인 시 계약 충돌 제로</div>
+      </div>
+
+      <div class="card" style="border-color:#bcd2f5">
+        <h3><span class="ic">B</span>우수조달물품 지정 → 3자단가 <span class="badge b-star">⭐최종 목표</span></h3>
+        <p class="kv"><b>신청 자격</b> <b>저작권등록된 GS인증 SW는 단독 신청 가능</b>(특허·NEP 없이도) ← SLCDR 해당</p>
+        <p class="kv"><b>심사</b> 1차(핵심기술 30 / 주변 18 / 신인도 3, <b>합산 70점↑ 통과</b>) → 2차 계약심사협의회</p>
+        <p class="kv"><b>혜택</b> <b>수의계약 가능</b> · 신인도 가점 · 유효 3년+최대3년</p>
+        <div class="note tip"><b>합격 팁</b> GS단독 신청은 자격은 되나 70점 통과는 별개. <b>특허 1건↑이면 기술배점에서 크게 유리</b> → CDR 무해화 엔진 특허 확보/출원 병행</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">↧</span>B 절차 (단계별)</h3>
+        <ol class="steps">
+          <li>지정 신청(온라인) + 적용기술(GS+저작권)·규격서·시중거래실적 제출</li>
+          <li><b>1차 심사</b> — 외부 전문가(교수·변리사·특허심사관) 기술·품질 평가, <b>70점↑ 통과</b></li>
+          <li><b>2차 심사</b> — 조달청 계약심사협의회 조달적합성 검증</li>
+          <li>우수조달물품 <b>지정</b> → 제3자단가계약(수의계약 가능)</li>
+          <li>디지털서비스몰 등록 (기존 B′ 계약은 해지·전환)</li>
+        </ol>
+        <p class="kv"><b>처리기간</b> 수개월(심사 회차·준비 따라) · <b>유효</b> 3년+최대 3년 연장</p>
+        <div class="note warn"><b>미확인</b> 지정 신청 회차·정식 제출서류 목록 → 조달청 우수조달 담당과 확인</div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">A</span>상용SW 다수공급자계약(MAS) <span class="badge b-muted">우선순위 최저</span></h3>
+        <p class="kv"><b>진입</b> 연 거래 3천만↑·3개사↑ / 신용 B↑ / GS는 적격성평가 면제</p>
+        <p class="kv b-red"><b>❌ 약점</b> <b>2단계경쟁 의무</b>(중기간경쟁 1억↑·그외 5천만↑) → 수의 우위 없음, 영업 불리</p>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">⚖</span>비교표</h3>
+        <div class="tbl-wrap"><table>
+          <tr><th>항목</th><th>A. MAS</th><th>B′. GS기반 3자단가</th><th>B. 우수조달</th></tr>
+          <tr><td>수의계약</td><td>❌(2단계경쟁)</td><td>❌</td><td><b>✅ 가능</b></td></tr>
+          <tr><td>진입 속도</td><td>보통</td><td><b>⭐빠름</b></td><td>느림(수개월)</td></tr>
+          <tr><td>영업 용이성</td><td>하</td><td>중</td><td><b>⭐상</b></td></tr>
+          <tr><td>핵심 자격</td><td>적격성+GS</td><td>GS+실적3건</td><td>GS+저작권→70점</td></tr>
+          <tr><td>SLCDR</td><td>비권장</td><td><b>즉시 진입</b></td><td><b>최종 목표</b></td></tr>
+        </table></div>
+        <div class="note warn"><b>미확인</b> 우수조달 수의계약 근거·금액한도, 지정 회차·심사기간, SLCDR에 CC/보안기능확인서 추가요구 여부 → <b>조달청 1588-0800 / 디지털서비스 이용지원센터</b></div>
+      </div>
+    </section>
+
+    <!-- ================= ROADMAP ================= -->
+    <section class="panel" id="slm">
+      <h2 class="ph">B · SLM 나라장터 등록 <span class="badge b-warn">GS인증 선행</span></h2>
+      <p class="ph-sub">SECULETTER MANAGER — MARS 플랫폼 중앙 통합관리 어플라이언스(HW+SW)</p>
+
+      <div class="card">
+        <h3><span class="ic">📖</span>제품 개요</h3>
+        <p class="kv"><b>SLM = SECULETTER MANAGER</b> · SLF/SLE 장비를 단일 콘솔로 통합관리(대시보드·로그통합·정책일괄배포) · <b>HW+SW 일체형 어플라이언스</b></p>
+        <p class="kv"><b>경로</b> SLCDR과 동일한 상용SW 3자단가 경로. 단 <b>GS인증이 없어 그 확보가 최우선</b></p>
+      </div>
+      <div class="card" style="border-color:#f0c36b;background:#fffaf0">
+        <h3><span class="ic" style="background:var(--amber-bg);color:var(--amber)">!</span>STEP 1 · GS인증 확보 ★최우선·임계경로</h3>
+        <p class="kv"><b>SLM은 GS인증 대상 O</b> — TTA 시험대상 "웹관리도구/보안용 SW"에 해당. 자사개발이라 <b>1등급 신청</b></p>
+        <p class="kv"><b>신청처</b> TTA 소프트웨어품질인증팀(swtc@tta.or.kr, 02-2132-4040) 등 5개 시험기관</p>
+        <ol class="steps">
+          <li>사전상담(상담요청서+제품설명자료) → 대상검토·견적</li>
+          <li>신청·수수료 납부</li>
+          <li>시험 준비(시험자 배정·환경구성, 대기 10~15일)</li>
+          <li>시험/인증(분석→시험→결함보고→패치→회귀시험)</li>
+          <li>시험성적서·인증서·인증마크 발급</li>
+        </ol>
+        <div class="tbl-wrap"><table>
+          <tr><th>항목</th><th>내용</th></tr>
+          <tr><td>순수 시험기간</td><td>약 <b>2~4주</b></td></tr>
+          <tr><td>전체(신청~발급)</td><td><b>3~7개월</b> (대기 길면 더) → <b>일정 6~8개월 버퍼</b></td></tr>
+          <tr><td>비용</td><td>견적제(제품규모·환경별) · <b>중소기업 할인</b> 有 · 정액 아님(미확인)</td></tr>
+          <tr><td>유효</td><td>주요버전/연1회 재인증 개념</td></tr>
+        </table></div>
+        <div class="note warn"><b>즉시 확인</b> SLM GS인증 기보유 여부. 없으면 <b>이 단계가 전체 임계경로</b> → TTA 사전상담부터</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">②</span>STEP 2 · SW 저작권등록</h3>
+        <p class="kv">SLM 프로그램 저작권등록(CROS) → 저작권등록증 + 프로그램등록부 (버전 일치)</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">②</span>STEP 2 · 저작권등록(프로그램)</h3>
+        <p class="kv">한국저작권위원회(CROS) 프로그램 등록 → 등록증+등록부 · <b>직접 2~4만원 / 대행 20~25만원</b> · 버전 일치</p>
+      </div>
+      <div class="card">
+        <h3><span class="ic">③</span>STEP 3 · 물품분류·목록화 (HW+SW 어플라이언스)</h3>
+        <p class="kv">보안소프트웨어 <b>4323320501</b> · 규격(모델)별 물품식별번호</p>
+        <div class="note tip"><b>선례 있음</b> HW+SW 일체형 어플라이언스도 상용SW 3자단가 등록 사례 존재(예: Veritas 백업 어플라이언스)</div>
+        <div class="note warn"><b>확인 필수</b> SLM을 <b>SW로 통째 목록화 vs HW 별도 물품계약 분리</b> 여부 → 조달청 상용SW 담당 1588-0800 사전상담</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">④</span>STEP 4 · 상용SW 3자단가 → 디지털서비스몰 등록</h3>
+        <p class="kv">[3]나라장터 자격 + 가격자료(규격별 3건) → 가격협상(기준가 94.5~96%) → 계약(최대 6년) → 게시</p>
+        <div class="note tip"><b>2022.12 완화</b> 정보보호SW도 CC 없이 <b>GS인증만으로 3자단가 신청 가능</b>. 단 공공 납품 시 도입기관·유형별 보안적합성(CC/보안기능확인서) 별도 확인</div>
+        <div class="note">공통 자격(중소기업·SW사업자 신고·공동인증서·SW사업자 확인서)은 <b>이미 보유</b> → SLM만의 관문은 GS인증뿐</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">✓</span>남은 확인</h3>
+        <ul class="chk" data-store>
+          <li><input type="checkbox" id="slm1"><label for="slm1">SLM GS인증 보유 여부 (없으면 신청 최우선)</label></li>
+          <li><input type="checkbox" id="slm2"><label for="slm2">SLM 물품분류(보안SW/서버 포함) 조달청 확인</label></li>
+          <li><input type="checkbox" id="slm3"><label for="slm3">SLM 프로그램 저작권등록 여부</label></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel" id="innov">
+      <h2 class="ph">C · 혁신장터 등록 <span class="badge b-ok">특허 보유 확인됨</span></h2>
+      <p class="ph-sub">엔트리급(MARS 450)·CDR·SLM 혁신제품 지정 → 3년 수의계약</p>
+
+      <div class="card">
+        <h3><span class="ic">📖</span>개요 &amp; 대상</h3>
+        <p class="kv"><b>포털</b> 혁신조달 종합포털 <b>ppi.g2b.go.kr</b> · 지정 시 <b>3년간 수의계약</b> + 시범구매·구매면책·혁신구매목표제</p>
+        <p class="kv"><b>대상(대표님 지시)</b> ① 엔트리급 = <b>MARS PLATFORM 450</b> ② CDR(SLCDR) ③ SLM</p>
+      </div>
+      <div class="card" style="border-color:#9ed9b8;background:#f0fbf5">
+        <h3><span class="ic" style="background:var(--green-bg);color:var(--green)">✓</span>STEP 0 · 특허 확인 ✅ 완료 (2026.07.01 · KIPRIS 조회)</h3>
+        <p class="kv"><b>시큐레터 국내 특허·실용신안 35건 보유</b>(출원인=시큐레터㈜, 대부분 등록). 혁신제품(기술마켓형) 특허 요건 충족.</p>
+        <div class="tbl-wrap"><table>
+          <tr><th>제품</th><th>보유 특허(예시) · 판정</th></tr>
+          <tr><td><b>MARS Entry(450)</b></td><td><span class="badge b-ok">충족</span> 메모리분석 비실행파일 악성검사(등록), 응용프로그램 실행흐름 악성탐지, 분산 가상환경 분석, 디버깅엔진 매크로탐지, OOXML 문서 내부특징검사 등 <b>등록특허 다수</b></td></tr>
+          <tr><td><b>CDR(SLCDR)</b></td><td><span class="badge b-ok">충족</span> <b>"리버싱 엔진과 CDR 엔진을 활용한 악성 비실행파일 차단"</b>(출원 10-2022-7017840, 2022-05-26, 등록) — CDR 엔진 명시</td></tr>
+          <tr><td>SLM(Manager)</td><td><span class="badge b-warn">관리SW 특허 없음</span> → <b>디지털서비스형 경로</b> 권장</td></tr>
+        </table></div>
+        <div class="note tip">→ MARS·CDR은 <b>특허 관문 통과</b>(기술마켓형 신청 가능). SLM은 특허 대신 디지털서비스형(디지털서비스몰 등록)으로.</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">①</span>STEP 1 · 유형 선택</h3>
+        <div class="tbl-wrap"><table>
+          <tr><th>유형</th><th>정의</th><th>적합</th></tr>
+          <tr><td><b>유형2 혁신시제품</b>(舊 FT-Ⅱ, 공급자제안형)</td><td>TRL 7↑ 상용화 직전 제품 · <b>조달청</b>이 혁신성 인정</td><td><b>MARS·CDR·SLM</b> 정석</td></tr>
+          <tr><td>유형1(FT-Ⅰ/Ⅲ)</td><td>국가 R&D 성과물 / 부처 발굴·추천</td><td>부처 R&D 연계 시</td></tr>
+          <tr><td>디지털서비스형</td><td>과기정통부 디지털서비스 선정 + 디지털서비스몰 등록</td><td>SLM·CDR(SaaS화 시)</td></tr>
+        </table></div>
+        <div class="note warn"><b>배제요건</b> 이미 지정/우수조달/MAS 계약된 동일 물품식별번호는 신청 불가 · 동일 식별번호 <b>4회 탈락</b> 시 심사 제외</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">②</span>STEP 2 · 신청 (사전절차 + 제출서류)</h3>
+        <p class="kv"><b>사전(필수)</b> 나라장터 입찰참가자격 등록 + <b>세부물품분류(제조) 등록·물품식별번호</b> 부여</p>
+        <p class="kv"><b>온라인 신청</b> 혁신장터(ppi.g2b.go.kr) → 혁신시제품 지정신청 공고</p>
+        <p class="kv"><b>핵심 입력</b> 지식재산권 보유현황(<b>특허 등록번호+권리자 입력→자동검증</b>), 기술완성도 TRL 7/8/9, 최근 3년 매출, 신청분야 1개</p>
+        <p class="kv"><b>첨부</b> 특허증+등록원부+등록공보(zip), <b>혁신시제품 제안서</b>(핵심기술 1개↑ 적용), <b>규격서</b></p>
+        <div class="note tip">시큐레터 <b>등록특허 다수</b> = 지재권 자동검증 항목에서 강점. <b>실제 제품에 적용된 특허만</b> 등록(특허적용확인서로 검증)</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">③</span>STEP 3 · 평가 (2단계) + 시범구매</h3>
+        <div class="tbl-wrap"><table>
+          <tr><th>평가</th><th>방식</th><th>통과기준</th></tr>
+          <tr><td>공공성(서면)</td><td>항목별</td><td>각 항목 참석위원 <b>2/3 '적합'</b></td></tr>
+          <tr><td>혁신성(대면)</td><td>발표(10분+질의10분)</td><td>최고·최저 제외 <b>평균 70점↑</b></td></tr>
+        </table></div>
+        <p class="kv">1차 통과 → 2차 추가서류(최종규격서·특허적용확인·식별번호) → <b>조달정책심의위 심의 → 지정</b></p>
+        <div class="note tip"><b>시범구매</b> 지정 후 수요조사·시범사용(1년내)→성공판정 시 <b>우수조달물품 심사 특례</b>(2/3 찬성 합격). 시범 후 후속구매 평균 6배</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">④</span>STEP 4 · 지정 → 수의계약 + 유효/혜택</h3>
+        <p class="kv"><b>지정</b> → 혁신장터 전용몰 등록 → 공공기관 <b>수의계약 직접구매</b></p>
+        <p class="kv"><b>유효기간</b> 기본 <b>3년</b> + 연장(1+2년) = <b>최대 6년</b> · <b>소요</b> 접수~지정 약 3개월</p>
+        <p class="kv"><b>혜택</b> 수의계약 · 구매면책 · 혁신구매목표제(1.0~1.7%) · 시범구매(2026 예산 839억)</p>
+        <div class="note tip">엔트리급(MARS 450)을 혁신장터로 올리면 <b>어빌리티·CC 부담 우회</b>해 시큐레터 직접 수의계약 채널 확보</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">🎯</span>제품별 권장 경로</h3>
+        <div class="tbl-wrap"><table>
+          <tr><th>제품</th><th>경로</th><th>비고</th></tr>
+          <tr><td>MARS Entry(450)</td><td>유형2(공급자제안) · 분야 안전/치안·AI</td><td>리버스엔지니어링 특허 활용, TRL 7~9</td></tr>
+          <tr><td>CDR(SLCDR)</td><td>유형2 우선 / SaaS화 시 디지털서비스형</td><td>CDR엔진 특허를 핵심기술로</td></tr>
+          <tr><td>SLM</td><td>MARS/CDR와 <b>복합품명 묶음</b> or SaaS화 디지털서비스형</td><td>단독 SW 혁신성 소명 어려움</td></tr>
+        </table></div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">☎</span>문의처</h3>
+        <p class="kv">혁신제품 지정 <b>02-6951-5143</b> · 시범사용 070-4056-7525 · 전용몰등록 070-4056-7672 · 물품식별번호 070-4056-6463 · 디지털서비스형(NIA) 053-230-1795</p>
+        <div class="note warn"><b>미확인</b> 보안/APT 제품의 혁신제품 지정 시 CC/보안기능확인서 필수 여부(지정 요건 vs 납품요건) → 조달청 유선 확인</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">✓</span>남은 확인</h3>
+        <ul class="chk" data-store>
+          <li><input type="checkbox" id="inv1" checked><label for="inv1">특허 보유 ✅ MARS·CDR 등록특허 다수(35건) / SLM은 특허 없음→디지털서비스형</label></li>
+          <li><input type="checkbox" id="inv2"><label for="inv2">제품별 경로(기술마켓형/디지털서비스형) 결정</label></li>
+          <li><input type="checkbox" id="inv3"><label for="inv3">엔트리급 = MARS 450 나라장터 물품등록 선행</label></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel" id="marsv2">
+      <h2 class="ph">D · MARS V2 수정 · APT 대기</h2>
+      <p class="ph-sub">기존 어빌리티 계약 관련 — 사용자수 수정 + APT 본체 대기</p>
+
+      <div class="card">
+        <h3><span class="ic">🔧</span>D-1 · MARS V2 사용자수 수정 (수정계약)</h3>
+        <p class="kv">사용자수 티어 추가/변경 = <b>규격 추가(수정계약)</b>. 규격별 최근 1년 3건 판매실적·규격서 필요</p>
+        <div class="tbl-wrap"><table>
+          <tr><th>항목</th><th>내용</th></tr>
+          <tr><td><b>신청 주체</b></td><td><b>계약상대자(어빌리티)만 가능</b>. 시큐레터(제조사)는 규격서·가격근거 제공 후방 역할</td></tr>
+          <tr><td><b>90일 룰</b></td><td>당초 계약/직전 수정계약일로부터 <b>90일 경과 후</b>에만 수정계약 가능</td></tr>
+          <tr><td>예외</td><td>CC인증 <b>취소·만료 시</b>엔 90일 내에도 규격변경 가능(→방치 시 규격조정 강제 위험)</td></tr>
+        </table></div>
+        <div class="note warn"><b>실행</b> ① 직전 계약/수정 후 90일 경과 확인 ② <b>어빌리티에 수정계약 요청·협조</b>(협조 의사가 관건)</div>
+      </div>
+      <div class="card" style="border-color:#9ed9b8;background:#f0fbf5">
+        <h3><span class="ic" style="background:var(--green-bg);color:var(--green)">✓</span>D-2 · CC 재인증 <span class="badge b-ok">별도 진행 중</span></h3>
+        <p class="kv">CISS-1185-2022(시큐레터 명의, 국내용 CC) 만료 2027.9.27 — <b>사내 별도 트랙에서 진행 중</b> (본 계획 범위 외)</p>
+        <div class="tbl-wrap"><table>
+          <tr><th>경로(참고)</th><th>조건 · 효과</th></tr>
+          <tr><td>효력연장(보증연장)</td><td>변경 없음/경미 → 만료일로부터 5년 1회 연장 · 만료 120일 전 신청</td></tr>
+          <tr><td>재평가</td><td>주요 변경 시 → 신규평가 준함</td></tr>
+        </table></div>
+        <div class="note tip">주체는 시큐레터(어빌리티 무관). 만료 시 <b>시큐레터 주도 채널 전환 레버리지</b> 유지 — CC가 유지되므로 27.9 이후 MARS 채널 재편에 활용</div>
+      </div>
+      <div class="card">
+        <h3><span class="ic">✓</span>남은 확인</h3>
+        <ul class="chk" data-store>
+          <li><input type="checkbox" id="mv1"><label for="mv1">어빌리티 MARS V2 사용자수 수정 협조 의사</label></li>
+          <li><input type="checkbox" id="mv2" checked><label for="mv2">CC 재인증 ✅ 사내 별도 트랙 진행 중</label></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ================= DOCS ================= -->
+    <section class="panel" id="docs">
+      <h2 class="ph">▤ 서류 마스터 &amp; 파일 정리</h2>
+      <p class="ph-sub">SLCDR 직접등록(B′) 기준 · 상태: ✅보유 📥온라인발급 📝작성·취합 ❓확인 · 체크는 자동저장</p>
+
+      <div class="card lead">
+        <h3>📁 파일 폴더 구조 (사내 공유 드라이브에 이대로)</h3>
+        <div class="flow" style="background:#0a1f3d">SLCDR_조달등록_서류/
+├─ 00_인증·권리(SLCDR)/   ← GS인증서 SLCDR V1 ✅ / 저작권등록증·등록부(발급)
+├─ 01_기업서류/           ← 등기부·인감·완납·재무제표·중소기업확인서
+├─ 02_제조증명·자격/       ← SW사업자 관리확인서 / 경쟁입찰참가자격등록증
+├─ 03_가격자료/           ← 별지4·5·6호 / 매출장 / 세금계산서(규격별 3건)
+├─ 04_제품자료/           ← 규격서·카탈로그·제품이미지
+└─ 99_참고_MARS(별건)/    ← CC·GS(MARS) — SLCDR엔 불필요</div>
+        <p style="color:#cfe0fa;font-size:12px;margin:8px 0 0">폴더는 이미 <b>Documents/Claude/SLCDR_조달등록_서류/</b> 에 생성해 두었고, 보유 인증서 4종은 배치 완료.</p>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3><span class="ic">🔖</span>00 · 인증·권리 (SLCDR)</h3>
+          <ul class="chk" data-store>
+            <li><input type="checkbox" id="d00a" checked><label for="d00a"><span class="badge b-ok">보유</span> GS인증서 SLCDR V1 (25-0158)</label></li>
+            <li><input type="checkbox" id="d00b"><label for="d00b"><span class="badge b-star">발급</span> 저작권등록증 SLCDR V1 (C-2025-015380) — CROS</label></li>
+            <li><input type="checkbox" id="d00c"><label for="d00c"><span class="badge b-star">발급</span> 프로그램 등록부 SLCDR V1 — CROS</label></li>
+            <li><input type="checkbox" id="d00d"><label for="d00d"><span class="badge b-warn">확인</span> GS인증 SW 선정확인서 SLCDR V1</label></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="ic">🏢</span>01 · 기업서류</h3>
+          <ul class="chk" data-store>
+            <li><input type="checkbox" id="d01a"><label for="d01a"><span class="badge b-muted">취합</span> 사업자등록증</label></li>
+            <li><input type="checkbox" id="d01b"><label for="d01b"><span class="badge b-star">발급</span> 법인등기부등본 (인터넷등기소)</label></li>
+            <li><input type="checkbox" id="d01c"><label for="d01c"><span class="badge b-muted">취합</span> 인감증명서 + 사용인감계</label></li>
+            <li><input type="checkbox" id="d01d"><label for="d01d"><span class="badge b-star">발급</span> 국세·지방세 완납증명 (홈택스/위택스)</label></li>
+            <li><input type="checkbox" id="d01e"><label for="d01e"><span class="badge b-star">발급</span> 표준재무제표 확인원 (홈택스)</label></li>
+            <li><input type="checkbox" id="d01f"><label for="d01f"><span class="badge b-muted">취합</span> 신용평가등급 확인서</label></li>
+            <li><input type="checkbox" id="d01g"><label for="d01g"><span class="badge b-star">발급</span> 중소기업확인서 (sminfo) <span class="badge b-ok">자격됨</span></label></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="ic">🏭</span>02 · 제조증명·자격</h3>
+          <ul class="chk" data-store>
+            <li><input type="checkbox" id="d02a"><label for="d02a"><span class="badge b-star">발급</span> SW사업자 일반현황 관리확인서 (SWIT) <span class="badge b-ok">신고됨</span></label></li>
+            <li><input type="checkbox" id="d02b" checked><label for="d02b"><span class="badge b-ok">보유</span> 범용 공동인증서(법인)</label></li>
+            <li><input type="checkbox" id="d02c"><label for="d02c"><span class="badge b-muted">후속</span> 경쟁입찰참가자격등록증 ([3] 후 발급)</label></li>
+          </ul>
+          <div class="note tip">지문보안토큰 불필요(2024.1.1 폐지)</div>
+        </div>
+        <div class="card">
+          <h3><span class="ic">📑</span>03 · 가격자료</h3>
+          <ul class="chk" data-store>
+            <li><input type="checkbox" id="d03a"><label for="d03a"><span class="badge b-muted">작성</span> 가격자료 제출서 (별지 제4호)</label></li>
+            <li><input type="checkbox" id="d03b"><label for="d03b"><span class="badge b-muted">작성</span> 견적서 (별지 제5호)</label></li>
+            <li><input type="checkbox" id="d03c"><label for="d03c"><span class="badge b-muted">작성</span> 규격별 거래내역 (별지 제6호)</label></li>
+            <li><input type="checkbox" id="d03d"><label for="d03d"><span class="badge b-muted">취합</span> 매출장(1년) + 전자세금계산서(규격별 3건↑)</label></li>
+          </ul>
+          <div class="note warn">세금계산서에 <b>SLCDR V1</b> 버전 표기 확인 필수</div>
+        </div>
+        <div class="card">
+          <h3><span class="ic">🖼</span>04 · 제품자료</h3>
+          <ul class="chk" data-store>
+            <li><input type="checkbox" id="d04a"><label for="d04a"><span class="badge b-muted">작성</span> SLCDR 규격서·사양서 (판매단위 확정)</label></li>
+            <li><input type="checkbox" id="d04b"><label for="d04b"><span class="badge b-muted">취합</span> 카탈로그</label></li>
+            <li><input type="checkbox" id="d04c"><label for="d04c"><span class="badge b-muted">취합</span> 제품 이미지(실행화면/박스)</label></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="ic">📦</span>99 · 참고 MARS <span class="badge b-muted">별건·불필요</span></h3>
+          <ul class="chk" style="pointer-events:none">
+            <li><span class="badge b-ok">보유</span> CC인증서 MARS V2 (2027.9.27 만료)</li>
+            <li><span class="badge b-ok">보유</span> GS인증서 MARS V3 (25-0195)</li>
+            <li><span class="badge b-ok">보유</span> GS인증서 MARS V2 (17-0363)</li>
+          </ul>
+          <div class="note">SLCDR 등록엔 미사용 — MARS 채널용으로 보관</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">⚡</span>즉시 확보 우선순위</h3>
+        <p class="kv"><b>1. 온라인 즉시발급</b> 저작권등록증·등록부(CROS) · 중소기업확인서(sminfo) · SW사업자확인서(SWIT) · 완납증명·재무제표(홈택스) · 등기부(인터넷등기소)</p>
+        <p class="kv"><b>2. 확인 1건</b> GS인증 SW 선정확인서 보유 여부</p>
+        <p class="kv"><b>3. 사내 취합(최다 공수)</b> 가격자료 — 규격별 거래 3건·세금계산서·매출장</p>
+      </div>
+    </section>
+
+    <!-- ================= CONTACT ================= -->
+    <section class="panel" id="contact">
+      <h2 class="ph">☎ 통합 문의처</h2>
+      <p class="ph-sub">미확인 항목 확정용 — 착수 시 전화 한 통으로 해결되는 것들</p>
+      <div class="card">
+        <div class="callbox">
+          <div class="c"><b>조달청 정부조달콜센터</b><span>나라장터·목록화·MAS·우수조달</span><div class="num">1588-0800</div></div>
+          <div class="c"><b>KOSA (AI·SW산업협회)</b><span>SW사업자 신고</span><div class="num">02-2188-6900</div></div>
+          <div class="c"><b>직접생산확인(유통원)</b><span>SMPP 직접생산확인</span><div class="num">1533-0092 · 02-2656-9988</div></div>
+          <div class="c"><b>중소기업확인서</b><span>중소기업현황정보시스템</span><div class="num">1811-6508</div></div>
+          <div class="c"><b>한국저작권위원회</b><span>프로그램 저작권등록</span><div class="num">1800-5455</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TODO ================= -->
+    <section class="panel" id="todo">
+      <h2 class="ph">✓ 즉시 착수 (오늘)</h2>
+      <p class="ph-sub">임계경로 단축의 핵심 — 선행작업부터 빠르게</p>
+      <div class="card">
+        <ul class="chk" data-store>
+          <li><input type="checkbox" id="t1" checked><label for="t1"><b>SLCDR 프로그램 저작권등록</b> ✅ 확인 완료 — C-2025-015380 (2025-04-23)</label></li>
+          <li><input type="checkbox" id="t2" checked><label for="t2"><b>SMPP 직접생산 확인기준 조회</b> ✅ 완료 — 보안SW는 <b>직접생산확인 비대상</b> 확인 → [2]는 대체로 불필요</label></li>
+          <li><input type="checkbox" id="t3" checked><label for="t3"><b>SW사업자 신고</b> ✅ 완료(SWIT 등재·영업) · <b>중소기업</b> 확인 → 중소기업확인서는 sminfo서 본인 발급</label></li>
+          <li><input type="checkbox" id="t4" checked><label for="t4"><b>범용 공동인증서(법인)</b> ✅ 보유 (만료일만 점검)</label></li>
+          <li><input type="checkbox" id="t5"><label for="t5">공통 기업서류 취합 시작</label></li>
+        </ul>
+      </div>
+      <div class="card lead">
+        <h3>전략 요지</h3>
+        <p>가장 빠른 길 = <b>GS인증 기반 상용SW 제3자단가계약(B′)</b>으로 경쟁사처럼 즉시 진입 → 특허 보강해 <b>우수조달물품(B)</b>로 수의계약 무기 확보 → MAS(A)는 2단계경쟁 때문에 비권장.</p>
+      </div>
+      <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:24px">출처: 조달청·KOSA·SMPP·NCSC·국가법령정보센터 공식자료 + 디지털서비스몰 실등록 확인 · "미확인" 항목은 추측 배제·문의처 명시</p>
+    </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // tab nav
+  const nav=document.getElementById('nav'), panels=document.querySelectorAll('.panel');
+  const side=document.getElementById('side'), scrim=document.getElementById('scrim');
+  function show(t){
+    panels.forEach(p=>p.classList.toggle('show',p.id===t));
+    nav.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.t===t));
+    document.querySelector('.content').scrollTo?.(0,0);
+    window.scrollTo(0,0);
+    closeSide();
+  }
+  nav.addEventListener('click',e=>{const b=e.target.closest('button');if(b)show(b.dataset.t);});
+  // mobile
+  function closeSide(){side.classList.remove('open');scrim.classList.remove('open');}
+  document.getElementById('mtoggle').onclick=()=>{side.classList.toggle('open');scrim.classList.toggle('open');};
+  scrim.onclick=closeSide;
+  // checkbox persistence + progress
+  const KEY='slcdr_plan_v1';
+  let state=JSON.parse(localStorage.getItem(KEY)||'{}');
+  const boxes=document.querySelectorAll('.chk input[type=checkbox]');
+  function paint(){
+    let total=boxes.length,done=0;
+    boxes.forEach(b=>{
+      if(state[b.id]!==undefined)b.checked=state[b.id];
+      if(b.checked){done++;b.closest('li')?.classList.add('done');}else b.closest('li')?.classList.remove('done');
+    });
+    const pct=total?Math.round(done/total*100):0;
+    document.getElementById('pct').textContent=pct+'%';
+    document.getElementById('barfill').style.width=pct+'%';
+  }
+  boxes.forEach(b=>b.addEventListener('change',()=>{state[b.id]=b.checked;localStorage.setItem(KEY,JSON.stringify(state));paint();}));
+  paint();
+</script>
+</body>
+</html>

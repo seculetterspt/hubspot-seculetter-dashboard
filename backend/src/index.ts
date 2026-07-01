@@ -12,7 +12,7 @@ import meetingsRouter from './routes/meetings.js';
 import weeklyMeetingsRouter from './routes/weekly-meetings.js';
 import weeklyReportsRouter from './routes/weekly-reports.js';
 import authRouter from './routes/auth.js';
-import { isAuthenticated, validateSession } from './middleware/auth.js';
+import { isAuthenticated, validateSession, requirePageAuth } from './middleware/auth.js';
 import { snapshotService } from './services/snapshot/SnapshotService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -60,6 +60,15 @@ app.use('/api/snapshot', isAuthenticated, snapshotRouter);
 app.use('/api/meetings', isAuthenticated, meetingsRouter);
 app.use('/api/weekly-meetings', isAuthenticated, weeklyMeetingsRouter);
 app.use('/api/weekly-reports', isAuthenticated, weeklyReportsRouter);
+
+// 5b. Protected report pages (SLCDR 조달등록 계획 / 가격표)
+// Gated behind HubSpot login session — sensitive tax invoices & pricing.
+// Must be registered BEFORE the public SPA static + SPA fallback so it takes precedence.
+const reportsPath = path.join(process.cwd(), 'reports');
+app.use('/reports', requirePageAuth, express.static(reportsPath, {
+  extensions: ['html'],  // /reports/slcdr -> slcdr/index.html
+}));
+console.log('[Server] Serving protected reports from:', reportsPath);
 
 // 6. Static files (comes after auth routes)
 const publicPath = path.join(process.cwd(), 'public');
