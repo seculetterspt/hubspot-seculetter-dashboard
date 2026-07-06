@@ -808,7 +808,7 @@ tbody tr.subtotal-single td { color: #7030A0; border-top: 1px solid #D4B8E8; }
   © 2026 시큐레터(SecuLetter). 내부용 가격 검토 자료.
 </div>
 
-<script src="xlsx.full.min.js"></script>
+<script src="xlsx-js-style.js"></script>
 <script>
 const ENTERPRISE_DATA = {
   450: {
@@ -1473,24 +1473,66 @@ function downloadPartnerXlsx() {
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const cols = [{ wch: 6 }, { wch: 22 }, { wch: 22 }, { wch: 16 }, { wch: 26 }, { wch: 11 }, { wch: 16 }, { wch: 16 }];
-  if (includeDist) cols.push({ wch: 16 });
+  const cols = [{ wch: 7 }, { wch: 22 }, { wch: 22 }, { wch: 17 }, { wch: 44 }, { wch: 12 }, { wch: 17 }, { wch: 17 }];
+  if (includeDist) cols.push({ wch: 17 });
   ws['!cols'] = cols;
   ws['!merges'] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: lastCol } },
   ];
+  ws['!rows'] = [{ hpt: 24 }, { hpt: 16 }, { hpt: 16 }, { hpt: 6 }, { hpt: 22 }];
 
-  // 가격 컬럼(정가/파트너가/총판가) 천단위 콤마 서식
+  // ---- 셀 스타일 (xlsx-js-style) ----
+  const HEADER_BG = '1F4E79';
+  const line = { style: 'thin', color: { rgb: 'C9D6E5' } };
+  const grid = { top: line, bottom: line, left: line, right: line };
+  const setS = (r, c, s) => {
+    const ref = XLSX.utils.encode_cell({ r, c });
+    if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+    ws[ref].s = s;
+  };
+
+  // 타이틀 / 부제 / 생성일
+  setS(0, 0, { font: { bold: true, sz: 15, color: { rgb: HEADER_BG } }, alignment: { vertical: 'center' } });
+  setS(1, 0, { font: { sz: 10, italic: true, color: { rgb: '666666' } } });
+  setS(2, 0, { font: { sz: 10, italic: true, color: { rgb: '999999' } } });
+
+  // 헤더 행 (r=4)
+  for (let C = 0; C <= lastCol; C++) {
+    setS(4, C, {
+      font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: HEADER_BG } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: grid,
+    });
+  }
+
+  // 데이터 행 (r>=5)
   const range = XLSX.utils.decode_range(ws['!ref']);
-  const priceStart = 6, priceEnd = lastCol;
-  for (let R = 4; R <= range.e.r; R++) {
-    for (let C = priceStart; C <= priceEnd; C++) {
-      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
-      if (cell && typeof cell.v === 'number') cell.z = '#,##0';
+  for (let R = 5; R <= range.e.r; R++) {
+    const nameCell = ws[XLSX.utils.encode_cell({ r: R, c: 2 })];
+    const isSub = nameCell && typeof nameCell.v === 'string' && nameCell.v.indexOf('합계') >= 0;
+    const zebra = ((R - 5) % 2 === 1);
+    for (let C = 0; C <= lastCol; C++) {
+      const isNum = C >= 6;
+      const s = {
+        font: { sz: 10, bold: isSub, color: { rgb: isSub ? HEADER_BG : '333333' } },
+        alignment: { horizontal: isNum ? 'right' : 'left', vertical: 'center', wrapText: C === 4 },
+        border: grid,
+      };
+      if (isSub) s.fill = { fgColor: { rgb: 'DCE6F2' } };
+      else if (zebra) s.fill = { fgColor: { rgb: 'F5F8FC' } };
+      setS(R, C, s);
+      if (isNum) {
+        const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+        if (cell && typeof cell.v === 'number') cell.z = '#,##0';
+      }
     }
   }
+
+  // 헤더 행 고정 (스크롤 시 유지)
+  ws['!freeze'] = { xSplit: 0, ySplit: 5, topLeftCell: 'A6', activePane: 'bottomLeft', state: 'frozen' };
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'MARS3.0 가격표');
