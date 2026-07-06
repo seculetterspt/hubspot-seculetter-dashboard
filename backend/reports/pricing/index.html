@@ -378,6 +378,31 @@ tbody tr.subtotal-single td { color: #7030A0; border-top: 1px solid #D4B8E8; }
   margin-top: 20px;
 }
 .footer a { color: #888; text-decoration: none; }
+
+/* 파트너 가격표 다운로드 */
+.dl-bar { margin: 4px 0 14px; }
+.dl-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #1F4E79; color: #fff; border: none; border-radius: 6px;
+  padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+  font-family: inherit;
+}
+.dl-btn:hover { background: #163a5c; }
+.dl-opts {
+  margin-top: 10px; border: 1px solid #d5deea; border-radius: 8px;
+  background: #f7f9fc; padding: 12px 14px; max-width: 620px;
+}
+.dl-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+.dl-row:last-child { margin-bottom: 0; }
+.dl-lab { font-size: 11px; font-weight: 700; color: #1F4E79; width: 40px; }
+.dl-opts label { font-size: 12px; color: #333; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.dl-opts label.dl-fixed { color: #999; cursor: default; }
+.dl-go {
+  background: #548235; color: #fff; border: none; border-radius: 6px;
+  padding: 7px 16px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.dl-go:hover { background: #3f6228; }
+.dl-hint { font-size: 10px; color: #999; font-style: italic; }
 </style>
 </head>
 <body>
@@ -408,6 +433,30 @@ tbody tr.subtotal-single td { color: #7030A0; border-top: 1px solid #D4B8E8; }
         <span class="pill school">학교</span> 공공 × 0.95
         <br>(최소소비자가 앵커 · 단위: 원 / VAT 제외)
       </div>
+
+      <div class="dl-bar">
+        <button class="dl-btn" id="dlOpen">📥 파트너 가격표 다운로드 (Excel)</button>
+        <div class="dl-opts" id="dlOpts" hidden>
+          <div class="dl-row">
+            <span class="dl-lab">시장</span>
+            <label><input type="checkbox" class="dl-mkt" value="enterprise" checked> 기업</label>
+            <label><input type="checkbox" class="dl-mkt" value="public"> 공공</label>
+            <label><input type="checkbox" class="dl-mkt" value="procurement"> 조달</label>
+            <label><input type="checkbox" class="dl-mkt" value="school"> 학교</label>
+          </div>
+          <div class="dl-row">
+            <span class="dl-lab">가격</span>
+            <label class="dl-fixed"><input type="checkbox" checked disabled> 정가 · 파트너가</label>
+            <label><input type="checkbox" id="dlDist"> 총판가 포함</label>
+          </div>
+          <div class="dl-row">
+            <span class="dl-lab"></span>
+            <button class="dl-go" id="dlGo">엑셀 다운로드</button>
+            <span class="dl-hint">단위: 원 · VAT 별도 · 파일: .xlsx</span>
+          </div>
+        </div>
+      </div>
+
       <div id="market-content"></div>
     </div>
 
@@ -759,6 +808,7 @@ tbody tr.subtotal-single td { color: #7030A0; border-top: 1px solid #D4B8E8; }
   © 2026 시큐레터(SecuLetter). 내부용 가격 검토 자료.
 </div>
 
+<script src="xlsx.full.min.js"></script>
 <script>
 const ENTERPRISE_DATA = {
   450: {
@@ -1361,6 +1411,97 @@ document.querySelectorAll('#seg-price .seg-btn').forEach(b => {
 });
 
 renderAll();
+
+// ============================================================
+// 파트너 가격표 다운로드 (Excel / .xlsx)
+// ============================================================
+function buildPartnerRows(markets, includeDist) {
+  const p = getParams();
+  const data = computeMarketData(p);
+  const header = ['시장', '등급', '제품', '제품유형', '제품상세', '지불방식', '정가(소비자가)', '파트너가'];
+  if (includeDist) header.push('총판가');
+  const rows = [header];
+
+  for (const market of markets) {
+    const mname = MARKET_META[market].name;
+    const isProc = market === 'procurement';
+    for (const model of [450, 900, 1800]) {
+      const comps = isProc ? ['MARS 플랫폼'] : ['MARS 플랫폼', 'CDR'];
+      let sL = 0, sP = 0, sD = 0, cnt = 0;
+      for (const comp of comps) {
+        const cm = ENTERPRISE_DATA[model][comp];
+        const r = data[model][market][comp];
+        if (!r || r.na) continue;
+        const row = [mname, MODEL_TIER_NAME[model], 'MARS PLATFORM ' + model,
+          cm.type, cm.desc, cm.pay, Math.round(r.list), Math.round(r.partner)];
+        if (includeDist) row.push(Math.round(r.dist));
+        rows.push(row);
+        sL += r.list; sP += r.partner; sD += r.dist; cnt++;
+      }
+      // 모델 합계 (구성 2개 이상일 때만)
+      if (cnt > 1) {
+        const sub = [mname, MODEL_TIER_NAME[model], 'MARS PLATFORM ' + model + ' 합계',
+          '', '(MARS + CDR)', '', Math.round(sL), Math.round(sP)];
+        if (includeDist) sub.push(Math.round(sD));
+        rows.push(sub);
+      }
+    }
+  }
+  return rows;
+}
+
+function downloadPartnerXlsx() {
+  const markets = [...document.querySelectorAll('.dl-mkt:checked')].map(c => c.value)
+    .sort((a, b) => MARKET_ORDER.indexOf(a) - MARKET_ORDER.indexOf(b));
+  if (!markets.length) { alert('시장을 하나 이상 선택하세요.'); return; }
+  const includeDist = document.getElementById('dlDist').checked;
+  const rows = buildPartnerRows(markets, includeDist);
+
+  const now = new Date();
+  const y = now.getFullYear();
+  const mo = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const priceLabel = includeDist ? '정가 · 파트너가 · 총판가' : '정가 · 파트너가';
+  const lastCol = includeDist ? 8 : 7;
+
+  const aoa = [
+    ['시큐레터 MARS 3.0 매입형 · 파트너 가격표'],
+    [priceLabel + ' · 단위: 원 · VAT 별도'],
+    ['생성일: ' + y + '-' + mo + '-' + d],
+    [],
+    ...rows,
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const cols = [{ wch: 6 }, { wch: 22 }, { wch: 22 }, { wch: 16 }, { wch: 26 }, { wch: 11 }, { wch: 16 }, { wch: 16 }];
+  if (includeDist) cols.push({ wch: 16 });
+  ws['!cols'] = cols;
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: lastCol } },
+  ];
+
+  // 가격 컬럼(정가/파트너가/총판가) 천단위 콤마 서식
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const priceStart = 6, priceEnd = lastCol;
+  for (let R = 4; R <= range.e.r; R++) {
+    for (let C = priceStart; C <= priceEnd; C++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (cell && typeof cell.v === 'number') cell.z = '#,##0';
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'MARS3.0 가격표');
+  XLSX.writeFile(wb, '시큐레터_MARS3.0_파트너가격표_' + y + mo + d + '.xlsx');
+}
+
+document.getElementById('dlOpen').addEventListener('click', () => {
+  const o = document.getElementById('dlOpts');
+  o.hidden = !o.hidden;
+});
+document.getElementById('dlGo').addEventListener('click', downloadPartnerXlsx);
 </script>
 
 </body>
