@@ -12,7 +12,11 @@ import meetingsRouter from './routes/meetings.js';
 import weeklyMeetingsRouter from './routes/weekly-meetings.js';
 import weeklyReportsRouter from './routes/weekly-reports.js';
 import authRouter from './routes/auth.js';
-import { isAuthenticated, validateSession, requirePageAuth } from './middleware/auth.js';
+// 세션(구): /reports 정적 페이지 보호용으로만 잔존
+import { validateSession, requirePageAuth } from './middleware/auth.js';
+// Supabase JWT(신): /api/* 는 통합 콘솔(support 셸)의 Bearer 토큰으로 인증
+import { isAuthenticated, requireStaffOrAdmin } from './middleware/auth-supabase.js';
+import cors from 'cors';
 import { snapshotService } from './services/snapshot/SnapshotService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +35,17 @@ const sessionStore = new PostgresqlStore({
 });
 
 // IMPORTANT: Register middleware and routes in correct order
+// 0. CORS — 통합 콘솔(support 셸)이 다른 출처에서 Bearer 토큰으로 호출하므로 Authorization 허용 필수.
+//    허용 출처는 CORS_ORIGINS(콤마구분)로 오버라이드. 쿠키 안 씀(JWT 헤더).
+app.use(cors({
+  origin: (process.env.CORS_ORIGINS ||
+    'https://frontend-gamma-two-90.vercel.app,http://localhost:5173')
+    .split(',').map((o) => o.trim()).filter(Boolean),
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: false,
+}));
+
 // 1. Body parsing (must come before routes)
 app.use(express.json({ limit: '25mb' }));
 
@@ -54,12 +69,12 @@ app.use(validateSession);
 // 4. Auth routes (MUST come before static files to take precedence)
 app.use('/auth', authRouter);
 
-// 5. Protected API routes
-app.use('/api/analytics', isAuthenticated, analyticsRouter);
-app.use('/api/snapshot', isAuthenticated, snapshotRouter);
-app.use('/api/meetings', isAuthenticated, meetingsRouter);
-app.use('/api/weekly-meetings', isAuthenticated, weeklyMeetingsRouter);
-app.use('/api/weekly-reports', isAuthenticated, weeklyReportsRouter);
+// 5. Protected API routes — Supabase JWT 검증 + staff/admin 권한
+app.use('/api/analytics', isAuthenticated, requireStaffOrAdmin, analyticsRouter);
+app.use('/api/snapshot', isAuthenticated, requireStaffOrAdmin, snapshotRouter);
+app.use('/api/meetings', isAuthenticated, requireStaffOrAdmin, meetingsRouter);
+app.use('/api/weekly-meetings', isAuthenticated, requireStaffOrAdmin, weeklyMeetingsRouter);
+app.use('/api/weekly-reports', isAuthenticated, requireStaffOrAdmin, weeklyReportsRouter);
 
 // 5b. Protected report pages (SLCDR 조달등록 계획 / 가격표)
 // Gated behind HubSpot login session — sensitive tax invoices & pricing.
