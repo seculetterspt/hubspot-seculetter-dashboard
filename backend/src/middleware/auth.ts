@@ -7,11 +7,15 @@ import session from 'express-session';
 declare global {
   namespace Express {
     interface Request {
+      // 세션(구) + Supabase JWT(신) 양쪽이 채우는 canonical 형태.
+      // 세션 경로는 loginTimestamp를, JWT 경로는 id/role을 채운다.
       user?: {
         userId: string;
         email: string;
         name: string;
-        loginTimestamp: number;
+        loginTimestamp?: number;
+        id?: string;
+        role?: 'enduser' | 'partner' | 'staff' | 'admin';
       };
     }
   }
